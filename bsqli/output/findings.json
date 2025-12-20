@@ -1,0 +1,19 @@
+[
+  {
+    "url": "http://127.0.0.1:8000/search?name=test",
+    "parameter": "name",
+    "injection": "time",
+    "details": {
+      "type": "time",
+      "evidence": [
+        {
+          "db": "mssql",
+          "payload": " AND WAITFOR DELAY '00:00:5'",
+          "baseline": 0.0011806488037109375,
+          "t_inj": 5.001954555511475
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  }
+]

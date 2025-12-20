@@ -1,0 +1,1 @@
+"""BXSS detection modules."""

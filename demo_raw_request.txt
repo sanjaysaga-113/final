@@ -1,0 +1,6 @@
+POST /search HTTP/1.1
+Host: example.com
+Cookie: sessionid=abc123
+Content-Type: application/x-www-form-urlencoded
+
+q=test&sort=name
