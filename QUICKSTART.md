@@ -6,6 +6,8 @@
 pip install -r requirements.txt
 ```
 
+Ensure the Burp parameter wordlist remains present at [recon/wordlists/burp_parameter_names.txt](recon/wordlists/burp_parameter_names.txt); recon will fail fast if the file is missing.
+
 ## Common Commands
 
 ### 1. Blind SQL Injection - Single Domain with Recon

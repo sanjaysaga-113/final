@@ -350,6 +350,8 @@ CREATE TABLE callbacks (
 
 ### Reconnaissance
 
+**Wordlist requirement:** Active recon loads parameter candidates from [recon/wordlists/burp_parameter_names.txt](recon/wordlists/burp_parameter_names.txt) and will raise an error if the file is missing. Keep this file committed and present when cloning or deploying.
+
 #### Parameter Scoring
 
 ```python
