@@ -72,6 +72,10 @@ python main.py --scan bxss \
   -f targets.txt \
   --listener http://YOUR_PUBLIC_IP:5000 \
   --wait 60
+
+# Scan a raw HTTP POST request for XSS
+python main.py --raw post_request.txt --scan bxss \
+  --listener https://abc123.ngrok.io --wait 120
 ```
 
 ---
@@ -351,6 +355,8 @@ CREATE TABLE callbacks (
 ### Reconnaissance
 
 **Wordlist requirement:** Active recon loads parameter candidates from [recon/wordlists/burp_parameter_names.txt](recon/wordlists/burp_parameter_names.txt) and will raise an error if the file is missing. Keep this file committed and present when cloning or deploying.
+
+**URL discovery:** Recon uses `gau` (getallurls) to fetch URLs. The tool accepts bare domains (e.g., `example.com`) or full URLs (e.g., `http://example.com/path`). If `gau` is slow, the tool will wait for completion without timing out. Ensure `gau` is installed: `go install github.com/lc/gau/v2/cmd/gau@latest`.
 
 #### Parameter Scoring
 
@@ -637,9 +643,42 @@ if result["confirmed"]:
         print("[FALSE POSITIVE] Slow server detected")
 ```
 
----
-
 ## Testing & Validation
+
+### Demo Vulnerable App
+
+Test against a local Flask app with intentional XSS/SQLi vulnerabilities:
+
+**Terminal 1: Start demo app**
+```bash
+cd demo_vuln_app
+python app.py
+# Runs on http://127.0.0.1:5000
+```
+
+**Terminal 2: Start ngrok tunnel**
+```bash
+ngrok http 5000
+# Copy the ngrok URL (e.g., https://abc123.ngrok-free.app)
+```
+
+**Terminal 3: Run BXSS scan**
+```bash
+python main.py -f demo_vuln_app/urls_bxss.txt --scan bxss \
+  --listener https://abc123.ngrok-free.app \
+  --wait 120 --threads 2
+```
+
+Results saved to `bxss/output/findings_xss.json` and `.txt`
+
+### Using ngrok with BXSS
+
+1. **Create ngrok account:** https://ngrok.com
+2. **Authenticate:** `ngrok config add-authtoken YOUR_TOKEN`
+3. **Start tunnel:** `ngrok http 5000` (or any local port)
+4. **Use URL in scan:** `--listener https://YOUR_NGROK_URL`
+
+The callback server runs locally; ngrok tunnels callbacks back to your listener URL.
 
 ### Unit Tests
 
