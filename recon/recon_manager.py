@@ -36,14 +36,20 @@ def gather_parameterized_urls(domain_or_file: str, from_file: bool = False, scan
     else:
         urls = run_gau(domain_or_file)
 
+    logger.info("Recon input URLs: %d", len(urls))
+    if not urls and not from_file:
+        logger.error("Recon found no URLs. Ensure 'gau' is installed and accessible in this environment, or provide a URL file with -f.")
+
     # Filter based on scan type
     if scan_type == "bxss":
         filtered = [u for u in urls if "?" in u and "=" in u]
         logger.info("XSS filter: accepted %d parameterized URLs", len(filtered))
     else:
         filtered = run_gf_sqli(urls)
+        logger.info("SQLi filter: accepted %d URLs after gf/heuristic", len(filtered))
 
     normalized = normalize_and_dedup(filtered)
+    logger.info("After dedup: %d URLs", len(normalized))
     
     # Prioritize by parameter risk scoring
     prioritized = prioritize_urls(normalized)

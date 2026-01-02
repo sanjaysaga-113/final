@@ -21,6 +21,10 @@ def run_gf_sqli(urls: List[str], timeout: int = 10) -> List[str]:
         stdin = "\n".join(urls)
         out, _ = proc.communicate(stdin, timeout=timeout)
         hits = [l.strip() for l in out.splitlines() if l.strip()]
+        if not hits:
+            logger.info("gf returned 0 matches; using heuristic filtering instead.")
+            # Heuristic: keep URLs that look parameterized (either '?' alone or with '=')
+            return [u for u in urls if ("?" in u or "=" in u)]
         return hits
     except FileNotFoundError:
         logger.info("gf not found; using heuristic filtering.")

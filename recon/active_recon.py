@@ -30,7 +30,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 import requests
 
 SAFE_PARAM_WORDLIST: List[str] = [
-    "id", "uid", "user_id", "file", "url", "redirect", "callback", "next"
+    "id", "uid", "user_id", "file", "url", "redirexct", "callback", "next"
 ]
 
 SAFE_CONTENT_TYPES: List[str] = [
