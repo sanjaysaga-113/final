@@ -44,8 +44,12 @@ _FEATURE_HEADERS = [
     "baseline_time",
     "injected_time",
     "delta",
+    "delta_ratio",           # NEW: normalized delta (critical for accuracy)
     "content_length",
     "status_code",
+    "response_entropy",      # NEW: Shannon entropy of response body
+    "jitter_variance",       # NEW: std dev of baseline timing
+    "endpoint_class",        # NEW: for per-endpoint models
 ]
 
 def _ensure_store():
@@ -101,17 +105,61 @@ def prepare_feature_vector(
     injected_time: Optional[float],
     content_length: Optional[int],
     status_code: Optional[int],
+    response_body: Optional[str] = None,
+    jitter_variance: Optional[float] = None,
 ) -> Dict[str, Optional[object]]:
     """
     Build a normalized feature vector from detector outputs.
     This keeps feature construction centralized for future ML pipelines.
+    
+    NEW:
+    - delta_ratio: normalized delta (delta / baseline_time) - critical for accuracy
+    - response_entropy: Shannon entropy of response body
+    - jitter_variance: std dev of baseline timing (passed from detector)
     """
     delta = None
+    delta_ratio = None
+    response_entropy = None
+    
     try:
         if baseline_time is not None and injected_time is not None:
             delta = injected_time - baseline_time
+            # CRITICAL: Normalize delta by baseline (handles latency differences)
+            if baseline_time > 0:
+                delta_ratio = delta / baseline_time
     except Exception:
         delta = None
+        delta_ratio = None
+    
+    # Calculate Shannon entropy of response body
+    if response_body:
+        try:
+            import math
+            from collections import Counter
+            if len(response_body) > 0:
+                freq = Counter(response_body)
+                probs = [count / len(response_body) for count in freq.values()]
+                response_entropy = -sum(p * math.log2(p) for p in probs if p > 0)
+        except Exception:
+            response_entropy = None
+    
+    # Extract endpoint class (e.g., /login, /search) for per-endpoint models
+    endpoint_class = "unknown"
+    try:
+        from urllib.parse import urlparse
+        path = urlparse(url).path.lower()
+        if '/login' in path or '/auth' in path:
+            endpoint_class = "auth"
+        elif '/search' in path or '/query' in path:
+            endpoint_class = "search"
+        elif '/api/' in path:
+            endpoint_class = "api"
+        elif '/admin' in path:
+            endpoint_class = "admin"
+        else:
+            endpoint_class = "generic"
+    except Exception:
+        endpoint_class = "unknown"
 
     return {
         "timestamp": datetime.utcnow().isoformat(),
@@ -122,14 +170,45 @@ def prepare_feature_vector(
         "baseline_time": baseline_time,
         "injected_time": injected_time,
         "delta": delta,
+        "delta_ratio": delta_ratio,
         "content_length": content_length,
         "status_code": status_code,
+        "response_entropy": response_entropy,
+        "jitter_variance": jitter_variance,
+        "endpoint_class": endpoint_class,
     }
 
-# Placeholders for future ML work (do not implement ML logic here)
 # ML Model Implementation
 MODEL_PATH = Path(OUTPUT_DIR) / "isolation_forest_model.pkl"
 SCALER_PATH = Path(OUTPUT_DIR) / "feature_scaler.pkl"
+
+# Per-endpoint model paths
+MODEL_DIR = Path(OUTPUT_DIR) / "models"
+
+# Warm-up phase tracking (minimum samples before scoring)
+WARMUP_THRESHOLD = 30  # Minimum baseline requests before ML scoring
+_endpoint_request_counts = {}  # Track requests per endpoint
+_warmup_lock = threading.Lock()
+
+def is_warmup_complete(endpoint_class: str) -> bool:
+    """
+    Check if enough baseline data collected for reliable ML scoring.
+    Returns True if N >= WARMUP_THRESHOLD for this endpoint class.
+    """
+    with _warmup_lock:
+        count = _endpoint_request_counts.get(endpoint_class, 0)
+        return count >= WARMUP_THRESHOLD
+
+def increment_warmup_count(endpoint_class: str):
+    """Increment request count for endpoint class (warmup tracking)."""
+    with _warmup_lock:
+        _endpoint_request_counts[endpoint_class] = _endpoint_request_counts.get(endpoint_class, 0) + 1
+
+def get_warmup_progress(endpoint_class: str) -> Tuple[int, int]:
+    """Returns (current_count, threshold) for warmup progress."""
+    with _warmup_lock:
+        count = _endpoint_request_counts.get(endpoint_class, 0)
+        return (count, WARMUP_THRESHOLD)
 
 def load_model(path: Optional[str] = None) -> Optional[Tuple]:
     """
@@ -198,6 +277,76 @@ def train_model(data_source: Optional[str] = None) -> Optional[str]:
             return None
         
         # Train IsolationForest
+        import numpy as np
+        X = np.array(features_list)
+        
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        model = IsolationForest(
+            n_estimators=100,
+            contamination=0.1,
+            random_state=42,
+            max_samples='auto'
+        )
+        model.fit(X_scaled)
+        
+        # Save model and scaler
+        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with MODEL_PATH.open("wb") as mf:
+            pickle.dump(model, mf)
+        with SCALER_PATH.open("wb") as sf:
+            pickle.dump(scaler, sf)
+        
+        LOGGER.info(f"Trained IsolationForest on {len(features_list)} samples")
+        LOGGER.info(f"Model saved to {MODEL_PATH}")
+        return str(MODEL_PATH)
+    
+    except Exception as e:
+        LOGGER.warning(f"Training failed: {e}")
+        return None
+
+
+def score_feature_vector(vec: Dict) -> Optional[Tuple[int, float]]:
+    """
+    Score a single feature vector using loaded IsolationForest model.
+    Returns (anomaly_label, decision_score) or None if model unavailable.
+    
+    anomaly_label: -1 = anomaly (true positive), 1 = normal (potential false positive)
+    decision_score: lower is more anomalous
+    """
+    if not HAS_SKLEARN:
+        return None
+    
+    model_tuple = load_model()
+    if not model_tuple:
+        return None
+    
+    try:
+        model, scaler = model_tuple
+        
+        # Extract numeric features in same order as training
+        features = [
+            float(vec.get("baseline_time", 0)),
+            float(vec.get("injected_time", 0)),
+            float(vec.get("delta", 0)),
+            float(vec.get("content_length", 0)),
+            float(vec.get("status_code", 200)),
+        ]
+        
+        # Scale and predict
+        import numpy as np
+        X = np.array([features])
+        X_scaled = scaler.transform(X)
+        
+        label = model.predict(X_scaled)[0]
+        score = model.decision_function(X_scaled)[0]
+        
+        return (int(label), float(score))
+    
+    except Exception as e:
+        LOGGER.debug(f"Scoring failed: {e}")
+        return None
         X = [[f[0], f[1], f[2], f[3], f[4]] for f in features_list]
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)

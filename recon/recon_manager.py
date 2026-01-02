@@ -2,6 +2,7 @@ import logging
 from typing import List
 from .gau_runner import run_gau
 from .gf_filter import run_gf_sqli, normalize_and_dedup
+from .param_scorer import prioritize_urls, get_param_stats
 
 logger = logging.getLogger("recon.manager")
 if not logger.handlers:
@@ -43,5 +44,15 @@ def gather_parameterized_urls(domain_or_file: str, from_file: bool = False, scan
         filtered = run_gf_sqli(urls)
 
     normalized = normalize_and_dedup(filtered)
-    logger.info("Recon produced %d parameterized URLs", len(normalized))
-    return normalized
+    
+    # Prioritize by parameter risk scoring
+    prioritized = prioritize_urls(normalized)
+    
+    # Log parameter statistics
+    stats = get_param_stats(prioritized)
+    if stats:
+        top_params = list(stats.items())[:5]
+        logger.info(f"Top params: {', '.join(f'{p}({c})' for p, c in top_params)}")
+    
+    logger.info("Recon produced %d parameterized URLs (prioritized by injection risk)", len(prioritized))
+    return prioritized

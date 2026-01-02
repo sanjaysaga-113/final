@@ -30,14 +30,16 @@ class BlindXSSModule:
     - JSON body
     """
     
-    def __init__(self, listener_url: str, timeout: int = 10, wait_time: int = 5):
+    def __init__(self, listener_url: str, timeout: int = 10, wait_time: int = 5, obfuscate: bool = True, aggressive: bool = False):
         """
         Args:
             listener_url: OOB callback server URL
             timeout: HTTP request timeout
             wait_time: Seconds to wait after injection
+            obfuscate: Apply light payload mutators to bypass naive filters
+            aggressive: Enable stronger encodings (may be blocked by strict parsers)
         """
-        self.detector = BlindXSSDetector(listener_url, timeout, wait_time)
+        self.detector = BlindXSSDetector(listener_url, timeout, wait_time, obfuscate=obfuscate, aggressive=aggressive)
         self.listener_url = listener_url
     
     def scan_url(self, url: str) -> List[Dict]:

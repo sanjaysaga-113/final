@@ -39,16 +39,20 @@ class BlindXSSDetector:
     5. Correlation happens externally via correlation.py
     """
     
-    def __init__(self, listener_url: str, timeout: int = 10, wait_time: int = 5):
+    def __init__(self, listener_url: str, timeout: int = 10, wait_time: int = 5, obfuscate: bool = True, aggressive: bool = False):
         """
         Args:
             listener_url: Callback server URL (e.g., http://attacker.com:5000)
             timeout: HTTP request timeout
             wait_time: Seconds to wait after injection (for immediate callbacks)
+            obfuscate: Apply light mutators to bypass naive filters
+            aggressive: Enable stronger encodings (URL/html entity)
         """
         self.client = HttpClient(timeout=timeout)
         self.listener_url = listener_url
         self.wait_time = wait_time
+        self.obfuscate = obfuscate
+        self.aggressive = aggressive
     
     def _param_replace(self, url: str, param: str, new_value: str) -> str:
         """Replace parameter value in URL."""
@@ -79,6 +83,8 @@ class BlindXSSDetector:
             try:
                 # Substitute placeholders with this payload's UUID
                 payload = payload_templates.substitute_placeholders(template, self.listener_url, payload_uuid)
+                if self.obfuscate:
+                    payload = payload_templates.apply_mutators(payload, aggressive=self.aggressive)
                 
                 # Inject payload into parameter
                 test_url = self._param_replace(url, param, payload)
@@ -151,6 +157,8 @@ class BlindXSSDetector:
             try:
                 # Substitute placeholders with this payload's UUID
                 payload = payload_templates.substitute_placeholders(template, self.listener_url, payload_uuid)
+                if self.obfuscate:
+                    payload = payload_templates.apply_mutators(payload, aggressive=self.aggressive)
                 
                 # Build POST data with injected payload
                 post_data = base_data.copy()
@@ -214,6 +222,8 @@ class BlindXSSDetector:
             try:
                 # Substitute placeholders with this payload's UUID
                 payload = payload_templates.substitute_placeholders(template, self.listener_url, payload_uuid)
+                if self.obfuscate:
+                    payload = payload_templates.apply_mutators(payload, aggressive=self.aggressive)
                 
                 headers = {header_name: payload}
                 
@@ -278,6 +288,8 @@ class BlindXSSDetector:
             try:
                 # Substitute placeholders with this payload's UUID
                 payload = payload_templates.substitute_placeholders(template, self.listener_url, payload_uuid)
+                if self.obfuscate:
+                    payload = payload_templates.apply_mutators(payload, aggressive=self.aggressive)
                 
                 # Clone base JSON and inject payload
                 import copy

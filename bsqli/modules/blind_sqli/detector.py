@@ -1,10 +1,24 @@
+"""
+Blind SQLi Detection Module
+
+Includes:
+- Boolean-based detection (GET/POST/Cookie)
+- Time-based detection (GET/POST/Cookie)
+- Advanced time-based detection with:
+  * Multi-probe confirmation (SLEEP 3/5/7s linear scaling)
+  * Control payload (IF(1=2, SLEEP(5), 0) for false positive elimination)
+  * Jitter analysis (baseline timing variance)
+"""
+
 import urllib.parse
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Tuple
+import statistics
 from ...core.http_client import HttpClient
 from ...core.response_analyzer import measure_request_time, content_similarity, is_time_significant
 from .payload_engine import generate_payloads
 from ...core.logger import get_logger
 from .payloads import boolean_payloads
+from ...ml.anomaly_stub import persist_feature_vector, prepare_feature_vector
 
 logger = get_logger("sqli_detector")
 
@@ -80,6 +94,16 @@ class BlindSQLiDetector:
                         conf = "HIGH"
                     results["confidence"] = conf
                     logger.info(f"    -> MATCHED! Confidence: {conf}")
+                    
+                    # ML: Persist feature vector for boolean detection
+                    feature_vec = prepare_feature_vector(
+                        url=url, parameter=param, injection_type="boolean",
+                        payload=tpl["true"], baseline_time=baseline_t,
+                        injected_time=t_true, content_length=len_true,
+                        status_code=getattr(resp_true, "status_code", None)
+                    )
+                    persist_feature_vector(feature_vec)
+                    
                     # stop early on high confidence
                     if conf == "HIGH":
                         break
@@ -131,6 +155,16 @@ class BlindSQLiDetector:
                         conf = "HIGH"
                     results["confidence"] = conf
                     logger.info(f"    -> MATCHED (form)! Confidence: {conf}")
+                    
+                    # ML: Persist feature vector
+                    feature_vec = prepare_feature_vector(
+                        url=url, parameter=param, injection_type="boolean-form",
+                        payload=pair["true"], baseline_time=baseline_t,
+                        injected_time=t_true, content_length=len_true,
+                        status_code=getattr(resp_true, "status_code", None)
+                    )
+                    persist_feature_vector(feature_vec)
+                    
                     if conf == "HIGH":
                         break
             except Exception as e:
@@ -178,6 +212,16 @@ class BlindSQLiDetector:
                         conf = "HIGH"
                     results["confidence"] = conf
                     logger.info(f"    -> MATCHED (cookie)! Confidence: {conf}")
+                    
+                    # ML: Persist feature vector
+                    feature_vec = prepare_feature_vector(
+                        url=url, parameter=cookie_name, injection_type="boolean-cookie",
+                        payload=pair["true"], baseline_time=baseline_t,
+                        injected_time=t_true, content_length=len_true,
+                        status_code=getattr(resp_true, "status_code", None)
+                    )
+                    persist_feature_vector(feature_vec)
+                    
                     if conf == "HIGH":
                         break
             except Exception as e:
@@ -217,6 +261,16 @@ class BlindSQLiDetector:
                     })
                     results["confidence"] = conf
                     logger.info(f"    -> MATCHED (form)! Confidence: {conf}")
+                    
+                    # ML: Persist feature vector
+                    feature_vec = prepare_feature_vector(
+                        url=url, parameter=param, injection_type="time-form",
+                        payload=payload.get("payload", ""), baseline_time=baseline_t,
+                        injected_time=t_inj, content_length=len(getattr(resp_inj, "text", "")),
+                        status_code=getattr(resp_inj, "status_code", None)
+                    )
+                    persist_feature_vector(feature_vec)
+                    
                     if conf == "HIGH":
                         break
             except Exception as e:
@@ -254,6 +308,16 @@ class BlindSQLiDetector:
                     })
                     results["confidence"] = conf
                     logger.info(f"    -> MATCHED (cookie)! Confidence: {conf}")
+                    
+                    # ML: Persist feature vector
+                    feature_vec = prepare_feature_vector(
+                        url=url, parameter=cookie_name, injection_type="time-cookie",
+                        payload=payload.get("payload", ""), baseline_time=baseline_t,
+                        injected_time=t_inj, content_length=len(getattr(resp_inj, "text", "")),
+                        status_code=getattr(resp_inj, "status_code", None)
+                    )
+                    persist_feature_vector(feature_vec)
+                    
                     if conf == "HIGH":
                         break
             except Exception as e:
@@ -301,9 +365,208 @@ class BlindSQLiDetector:
                     })
                     results["confidence"] = conf
                     logger.info(f"    -> MATCHED! Confidence: {conf}")
+                    
+                    # ML: Persist feature vector for time-based detection
+                    feature_vec = prepare_feature_vector(
+                        url=url, parameter=param, injection_type="time-based",
+                        payload=payload.get("payload", ""), baseline_time=baseline_t,
+                        injected_time=t_inj, content_length=len(getattr(resp_inj, "text", "")),
+                        status_code=getattr(resp_inj, "status_code", None)
+                    )
+                    persist_feature_vector(feature_vec)
+                    
                     if conf == "HIGH":
                         break
             except Exception as e:
                 logger.debug("Time detection error: %s", e)
                 continue
         return results
+
+
+# =============================================================================
+# Advanced Time-Based Detection with False Positive Reduction
+# =============================================================================
+
+class AdvancedTimeBasedDetector:
+    """
+    Production-grade time-based SQLi detector with multi-probe confirmation.
+    
+    Features:
+    1. Multi-probe confirmation (sleep(3), sleep(5), sleep(7)) - verifies linear delay scaling
+    2. Control payload (IF(1=2, SLEEP(5), 0)) - detects slow servers vs real injection
+    3. Baseline jitter check - downgrades confidence if server timing is unstable
+    4. ML + rule hybrid - combines statistical and rule-based scoring
+    """
+    
+    def __init__(self, client: HttpClient):
+        self.client = client
+        self.jitter_threshold = 0.5  # Max acceptable std dev in baseline timing
+    
+    def _measure_baseline_jitter(self, url: str, headers: Dict = None, cookies: Dict = None, samples: int = 3) -> Tuple[float, float]:
+        """
+        Measure baseline request timing variance.
+        Returns: (mean_time, std_dev)
+        """
+        timings = []
+        for _ in range(samples):
+            try:
+                t, _ = measure_request_time(self.client.get, url, headers=headers, cookies=cookies)
+                timings.append(t)
+            except Exception:
+                pass
+        
+        if len(timings) >= 2:
+            mean = statistics.mean(timings)
+            std_dev = statistics.stdev(timings) if len(timings) > 1 else 0
+            return (mean, std_dev)
+        return (timings[0] if timings else 0.5, 0)
+    
+    def _inject_payload(self, url: str, param: str, payload: str, headers: Dict = None, cookies: Dict = None) -> float:
+        """
+        Inject payload and measure response time.
+        Returns: injected_time
+        """
+        try:
+            p = urllib.parse.urlparse(url)
+            qs = urllib.parse.parse_qs(p.query, keep_blank_values=True)
+            orig_val = qs.get(param, [""])[0]
+            qs[param] = [orig_val + payload]
+            new_q = urllib.parse.urlencode(qs, doseq=True)
+            injected_url = urllib.parse.urlunparse((p.scheme, p.netloc, p.path, p.params, new_q, p.fragment))
+            
+            t, _ = measure_request_time(self.client.get, injected_url, headers=headers, cookies=cookies)
+            return t
+        except Exception as e:
+            logger.debug(f"Injection failed: {e}")
+            return 0
+    
+    def multi_probe_confirmation(self, url: str, param: str, db: str = "mssql", headers: Dict = None, cookies: Dict = None) -> Dict[str, Any]:
+        """
+        Multi-probe confirmation: test sleep(3), sleep(5), sleep(7) and verify linear scaling.
+        
+        Returns:
+            {
+                "confirmed": bool,
+                "confidence": str,
+                "evidence": {
+                    "baseline": float,
+                    "jitter": float,
+                    "probes": [...],
+                    "linear_fit": float,  # R² score
+                }
+            }
+        """
+        result = {
+            "confirmed": False,
+            "confidence": "NONE",
+            "evidence": {}
+        }
+        
+        # Step 1: Measure baseline with jitter
+        baseline_mean, baseline_jitter = self._measure_baseline_jitter(url, headers, cookies)
+        logger.info(f"[MULTI-PROBE] Baseline: {baseline_mean:.2f}s ± {baseline_jitter:.2f}s")
+        
+        # Step 2: Jitter check - downgrade if unstable
+        if baseline_jitter > self.jitter_threshold:
+            logger.warning(f"[MULTI-PROBE] High baseline jitter ({baseline_jitter:.2f}s) - may cause false positives")
+        
+        # Step 3: Multi-probe (sleep 3, 5, 7 seconds)
+        delays = [3, 5, 7]
+        probes = []
+        
+        for delay in delays:
+            # Generate payload for this delay
+            if db == "mssql":
+                payload = f" WAITFOR DELAY '00:00:0{delay}'--"
+            elif db == "mysql":
+                payload = f" AND SLEEP({delay})--"
+            elif db == "postgresql":
+                payload = f" AND pg_sleep({delay})--"
+            else:
+                payload = f" AND SLEEP({delay})--"
+            
+            t_inj = self._inject_payload(url, param, payload, headers, cookies)
+            delta = t_inj - baseline_mean
+            
+            probes.append({
+                "expected_delay": delay,
+                "actual_delay": delta,
+                "injected_time": t_inj,
+                "payload": payload
+            })
+            
+            logger.debug(f"  Probe delay={delay}s → actual_delta={delta:.2f}s")
+        
+        # Step 4: Check for linear relationship (delay should scale linearly)
+        expected_delays = [p["expected_delay"] for p in probes]
+        actual_delays = [p["actual_delay"] for p in probes]
+        
+        # Simple linearity check: all actual_delays should be >= expected_delays - 1s
+        all_delayed = all(actual >= (expected - 1.0) for actual, expected in zip(actual_delays, expected_delays))
+        
+        # Calculate linear fit quality (R² approximation)
+        try:
+            # Check if delays increase monotonically
+            is_monotonic = all(actual_delays[i] < actual_delays[i+1] for i in range(len(actual_delays)-1))
+            
+            # Check if ratios are consistent (within 50% tolerance)
+            ratios = [actual / expected if expected > 0 else 0 for actual, expected in zip(actual_delays, expected_delays)]
+            ratio_std = statistics.stdev(ratios) if len(ratios) > 1 else 0
+            
+            linear_fit_score = 1.0 - min(ratio_std / max(ratios), 1.0) if ratios else 0.0
+        except Exception:
+            linear_fit_score = 0.0
+            is_monotonic = False
+        
+        logger.info(f"[MULTI-PROBE] Linear fit score: {linear_fit_score:.2f}, Monotonic: {is_monotonic}")
+        
+        # Step 5: Confidence scoring
+        if all_delayed and is_monotonic and linear_fit_score > 0.7:
+            if baseline_jitter < self.jitter_threshold:
+                result["confidence"] = "HIGH"
+            else:
+                result["confidence"] = "MEDIUM"  # Downgrade due to jitter
+            result["confirmed"] = True
+        elif all_delayed:
+            result["confidence"] = "LOW"
+            result["confirmed"] = True
+        
+        result["evidence"] = {
+            "baseline": baseline_mean,
+            "jitter": baseline_jitter,
+            "probes": probes,
+            "linear_fit": linear_fit_score,
+        }
+        
+        return result
+    
+    def control_payload_check(self, url: str, param: str, db: str = "mssql", headers: Dict = None, cookies: Dict = None) -> bool:
+        """
+        Control payload: inject IF(1=2, SLEEP(5), 0) - false condition should NOT delay.
+        If delay still happens, server is just slow → not SQLi.
+        
+        Returns: True if control passed (no delay = real injection), False if failed (slow server)
+        """
+        # Control payload: false condition should NOT trigger delay
+        if db == "mssql":
+            control_payload = " IF(1=2) WAITFOR DELAY '00:00:05'--"
+        elif db == "mysql":
+            control_payload = " AND IF(1=2, SLEEP(5), 0)--"
+        elif db == "postgresql":
+            control_payload = " AND (CASE WHEN 1=2 THEN pg_sleep(5) ELSE 0 END)--"
+        else:
+            control_payload = " AND IF(1=2, SLEEP(5), 0)--"
+        
+        baseline_mean, _ = self._measure_baseline_jitter(url, headers, cookies, samples=2)
+        t_control = self._inject_payload(url, param, control_payload, headers, cookies)
+        delta_control = t_control - baseline_mean
+        
+        logger.info(f"[CONTROL] Control payload delta: {delta_control:.2f}s (threshold: 3.0s)")
+        
+        # If control payload causes delay, it's a false positive (slow server)
+        if delta_control >= 3.0:
+            logger.warning(f"[CONTROL] FAILED - Server delayed on false condition (slow server detected)")
+            return False
+        
+        logger.info(f"[CONTROL] PASSED - No delay on false condition (likely real injection)")
+        return True

