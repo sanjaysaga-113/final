@@ -44,6 +44,12 @@ def gather_parameterized_urls(domain_or_file: str, from_file: bool = False, scan
     if scan_type == "bxss":
         filtered = [u for u in urls if "?" in u and "=" in u]
         logger.info("XSS filter: accepted %d parameterized URLs", len(filtered))
+    elif scan_type == "ssrf":
+        keywords = ["url", "redirect", "next", "callback", "webhook", "fetch", "uri", "link"]
+        filtered = [u for u in urls if "?" in u and any(k in u.lower() for k in keywords)]
+        if not filtered:
+            filtered = [u for u in urls if "?" in u and "=" in u]
+        logger.info("SSRF filter: accepted %d URLs after keyword heuristic", len(filtered))
     else:
         filtered = run_gf_sqli(urls)
         logger.info("SQLi filter: accepted %d URLs after gf/heuristic", len(filtered))

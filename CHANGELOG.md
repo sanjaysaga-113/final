@@ -1,5 +1,28 @@
 # Project Consolidation Changelog
 
+**Date:** January 4, 2026  
+**Action:** Added controlled SSRF capability detection, recon scoring upgrades, and SSRF demo endpoint
+
+---
+
+## New Features
+
+### ✅ SSRF Capability Module
+- Added `ssrf/` package with payload engine, detector, ML confidence scoring, and OOB listener wrapper
+- Controlled HTTP(S) payloads with UUID-tagged subdomains and query parameters (no localhost/metadata targets)
+- Detection tiers: OOB (callback) and EXPANDED (behavioral: redirects, timeout variance, error-class diffs)
+- Explainable decision traces per finding; reports stored in `ssrf/output/findings.json`
+
+### ✅ Recon Quality Improvements
+- Active recon now returns `ingestion_vector_scores` (0-1), `endpoint_class`, and `async_behavior`
+- SSRF scan path leverages these scores plus negative evidence tracking to reduce noise
+
+### ✅ CLI & Demo Updates
+- New CLI scan mode: `--scan ssrf` (requires `--listener`), shares callback server with BXSS
+- Demo vulnerable app: added `/fetch?url=` SSRF demo endpoint (server-side fetch with redirects and timing logs)
+
+---
+
 **Date:** January 2, 2026  
 **Action:** Documentation and code consolidation for cleaner project structure
 

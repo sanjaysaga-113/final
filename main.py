@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import time
+from typing import Dict, Any
 from bsqli.core.logger import get_logger
 from bsqli.core.config import THREADS
 from bsqli.core.config import OUTPUT_DIR
@@ -120,8 +121,8 @@ EXAMPLES:
     )
     ap.add_argument(
         "--scan",
-        choices=["sqli", "bxss"],
-        help="Scan module: 'sqli' for Blind SQL Injection, 'bxss' for Blind XSS",
+        choices=["sqli", "bxss", "ssrf"],
+        help="Scan module: 'sqli' for Blind SQL Injection, 'bxss' for Blind XSS, 'ssrf' for controlled SSRF capability",
         required=False
     )
     ap.add_argument(
@@ -132,7 +133,7 @@ EXAMPLES:
     )
     ap.add_argument(
         "--listener",
-        help="Callback server URL for BXSS detection (required for BXSS scans). Use ngrok, Interactsh, or your own server (e.g., https://abc123.ngrok.io or http://attacker.com:5000)",
+        help="Callback/OOB server URL for BXSS or SSRF detection. Use ngrok, Interactsh, or your own server (e.g., https://abc123.ngrok.io or http://attacker.com:5000)",
         required=False
     )
     ap.add_argument(
@@ -237,9 +238,9 @@ EXAMPLES:
         print("\nRun: python main.py -h for examples")
         return
     
-    # BXSS requires listener URL
-    if args.scan == "bxss" and not args.listener:
-        print_error("BXSS scan requires --listener URL")
+    # BXSS/SSRF require listener URL
+    if args.scan in {"bxss", "ssrf"} and not args.listener:
+        print_error(f"{args.scan.upper()} scan requires --listener URL")
         print("Examples:")
         print("  --listener https://abc123.ngrok.io     (use ngrok)")
         print("  --listener https://interactsh.com      (Interactsh)")
@@ -355,7 +356,53 @@ EXAMPLES:
 
         else:
             logger.info("No BXSS vulnerabilities confirmed via callback.")
-    
+    elif args.scan == "ssrf":
+        print_header("SSRF CAPABILITY SCAN MODE")
+        print_info(f"Listener URL: {args.listener}")
+        print_info(f"Recon produced {len(urls)} parameterized URLs")
+
+        from ssrf.core.detector import SSRFDetector
+        from ssrf.oob.listener import start_server_background, get_callbacks
+        from recon.active_recon import ActiveBlindRecon
+        from urllib.parse import urlparse
+
+        parsed_listener = urlparse(args.listener)
+        port = parsed_listener.port or 5000
+
+        print_info("Starting shared OOB callback server...")
+        start_server_background(host='0.0.0.0', port=port)
+        time.sleep(2)
+        print_success("Callback server ready")
+
+        detector = SSRFDetector(listener_url=args.listener, timeout=10, wait_time=args.wait)
+        all_injections = []
+        findings = []
+
+        for target in urls:
+            try:
+                recon_probe = ActiveBlindRecon(target, timeout=8.0, rate_limit=0.5)
+                recon_report = recon_probe.generate_recon_report()
+                if not recon_report.get("blind_capable"):
+                    logger.info("Skipping %s (not blind-capable per recon)", target)
+                    continue
+                injections = detector.run_oob_detection(target, recon_report)
+                all_injections.extend(injections)
+            except Exception as e:
+                logger.debug("SSRF scan error on %s: %s", target, e)
+
+        callbacks = get_callbacks()
+        correlated = detector.correlate_callbacks(callbacks)
+        expanded = detector.run_expanded_detection(all_injections)
+
+        merged: Dict[str, Dict[str, Any]] = {}
+        for item in correlated + expanded:
+            merged[item["uuid"].lower()] = item
+        findings = list(merged.values())
+
+        report = detector.generate_ssrf_report(findings)
+        print_success(f"SSRF scan complete. Findings: {len(findings)}")
+        print_info(f"Report: {report.get('json_path')} | {report.get('txt_path')}")
+
     else:  # sqli (default)
         logger.info("================================================================================")
         logger.info("RUNNING SCAN...")

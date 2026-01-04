@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
@@ -121,9 +121,10 @@ class ActiveBlindRecon:
     # ------------------------------------------------------------------
     # Probing methods
     # ------------------------------------------------------------------
-    def probe_parameters(self) -> Set[str]:
-        """Probe query/form/JSON parameters with safe placeholders."""
+    def probe_parameters(self) -> Tuple[Set[str], Dict[str, float]]:
+        """Probe query/form/JSON parameters with safe placeholders and capture latency."""
         accepted: Set[str] = set()
+        metrics: Dict[str, float] = {}
         parsed = urlparse(self.base_url)
         base_qs = parse_qs(parsed.query, keep_blank_values=True)
 
@@ -133,25 +134,38 @@ class ActiveBlindRecon:
             qs[p] = ["1"]  # Safe value
             new_query = urlencode(qs, doseq=True)
             candidate = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
+            t0 = time.time()
             resp = self._request("GET", candidate)
+            latency = time.time() - t0
             if resp and resp.status_code < 500:
                 accepted.add("query")
+                metrics["query_latency"] = latency
                 break
 
         # Form probing (safe echo of existing query params as form fields)
         form_keys = self.param_candidates[:3] or SAFE_PARAM_WORDLIST[:3]
         form_data = {p: "1" for p in form_keys}
+        t0 = time.time()
         resp = self._request("POST", self.base_url, data=form_data)
+        latency = time.time() - t0
         if resp and resp.status_code < 500:
             accepted.add("form")
+            metrics["form_latency"] = latency
+        else:
+            metrics["form_latency"] = latency
 
         # JSON probing (minimal object)
         json_keys = form_keys
+        t0 = time.time()
         resp = self._request("POST", self.base_url, json={p: "1" for p in json_keys})
+        latency = time.time() - t0
         if resp and resp.status_code < 500:
             accepted.add("json")
+            metrics["json_latency"] = latency
+        else:
+            metrics["json_latency"] = latency
 
-        return accepted
+        return accepted, metrics
 
     def probe_methods(self) -> List[str]:
         """Check which HTTP methods are accepted (non-destructive)."""
@@ -214,16 +228,49 @@ class ActiveBlindRecon:
             return "dns"
         return "none"
 
+    def _classify_endpoint(self, url: str) -> str:
+        path = urlparse(url).path.lower()
+        if any(k in path for k in ["auth", "login", "signin"]):
+            return "auth"
+        if any(k in path for k in ["search", "query", "filter"]):
+            return "search"
+        if any(k in path for k in ["fetch", "proxy", "callback", "webhook", "hook"]):
+            return "fetch"
+        if any(k in path for k in ["log", "analytics", "event"]):
+            return "analytics"
+        if any(k in path for k in ["upload", "file", "image", "media"]):
+            return "upload"
+        return "generic"
+
     # ------------------------------------------------------------------
     # Report generation
     # ------------------------------------------------------------------
     def generate_recon_report(self) -> Dict:
-        ingestion_vectors = self.probe_parameters()
+        ingestion_vectors, timing_metrics = self.probe_parameters()
         methods = self.probe_methods()
         content_types = self.probe_content_types()
         headers_accepted = self.probe_headers()
         async_behavior = self.infer_async_behavior()
         preferred_oob = self.infer_preferred_oob(headers_accepted, async_behavior)
+
+        def _score(vector: str, latency_key: str, base: float) -> float:
+            latency = timing_metrics.get(latency_key, 1.0)
+            bonus = 0.05 if latency < 0.7 else 0.0
+            if async_behavior:
+                bonus += 0.05
+            return round(min(base + bonus, 0.95), 2)
+
+        ingestion_vector_scores: Dict[str, float] = {}
+        if "query" in ingestion_vectors:
+            ingestion_vector_scores["query"] = _score("query", "query_latency", 0.9)
+        if "form" in ingestion_vectors:
+            ingestion_vector_scores["form"] = _score("form", "form_latency", 0.75)
+        if "json" in ingestion_vectors:
+            ingestion_vector_scores["json"] = _score("json", "json_latency", 0.7)
+        if headers_accepted:
+            ingestion_vector_scores["header"] = 0.8
+
+        endpoint_class = self._classify_endpoint(self.base_url)
 
         blind_capable = bool(ingestion_vectors) or async_behavior or bool(headers_accepted)
 
@@ -231,12 +278,15 @@ class ActiveBlindRecon:
             "url": self.base_url,
             "blind_capable": blind_capable,
             "ingestion_vectors": sorted(list(ingestion_vectors)),
+            "ingestion_vector_scores": ingestion_vector_scores,
             "async_behavior": async_behavior,
             "preferred_oob": preferred_oob,
+            "endpoint_class": endpoint_class,
             "evidence": {
                 "methods": methods,
                 "content_types": content_types,
                 "headers_accepted": headers_accepted,
+                "timing_metrics": timing_metrics,
             },
         }
 
