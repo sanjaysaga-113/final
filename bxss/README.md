@@ -28,28 +28,17 @@ bxss/
 
 **Black-box approach - NO response inspection.**
 
-1. **Payload Injection**: Generate UUID-tagged XSS payloads with obfuscation variants
-2. **OOB Callback**: Wait for HTTP callbacks from injected payloads (via ngrok or your server)
-3. **Correlation**: Match callback UUID with injection metadata (case-insensitive)
+1. **Payload Injection**: Generate UUID-tagged XSS payloads
+2. **OOB Callback**: Wait for HTTP callbacks from injected payloads
+3. **Correlation**: Match callback UUID with injection metadata
 4. **Validation**: Confirm timestamp ordering (callback after injection)
 
 ### Detection Criteria
 
 A vulnerability is **confirmed** ONLY if:
-- ✅ Callback UUID matches injection UUID (normalized to lowercase)
+- ✅ Callback UUID matches injection UUID
 - ✅ Callback timestamp > injection timestamp
 - ✅ Valid HTTP callback received on listener
-- ✅ Injection not expired (within 24-hour window)
-
-### Payload Obfuscation
-
-Payloads are automatically mutated to bypass simple filters:
-- `<!-- -->` comments: `<scr<!-- -->ipt>` → `<script>`
-- Spacing: `< script >` (spaces ignored by parser)
-- Case variations: `<SCRIPT>`, `<Script>`
-- Entity encoding: `&#60;script&#62;` and other variants
-
-**Why?** Real-world XSS filters often block simple patterns. Obfuscation tests resilience.
 
 ## Usage
 
@@ -62,12 +51,6 @@ python callback_server.py --host 0.0.0.0 --port 5000
 
 # 2. Run BXSS scan (in terminal 2)
 python main.py --scan bxss --file sample_urls.txt --recon --listener http://YOUR_IP:5000 --threads 2 --wait 30
-```
-
-### Scan Raw HTTP POST Request
-
-```bash
-python main.py --raw post_request.txt --scan bxss --listener https://abc123.ngrok.io --wait 120
 ```
 
 ### CLI Options
@@ -88,7 +71,6 @@ python main.py --scan bxss \
 - `--recon`: Run reconnaissance (gau + gf)
 - `--threads`: Concurrent workers (default: 2)
 - `--wait`: Seconds to wait for delayed callbacks (default: 30)
-- `--raw`: Raw HTTP request file (sqlmap -r format) for direct scanning
 
 ### Standalone Callback Server
 
@@ -96,23 +78,6 @@ python main.py --scan bxss \
 # Run callback server independently
 python bxss/oob/callback_server.py --host 0.0.0.0 --port 5000 --debug
 ```
-
-## Correlation & UUID Matching
-
-**How it works:**
-
-1. **Injection Recording:** Each payload is assigned a unique UUID and recorded in the injection tracker
-2. **Payload Injection:** UUID is embedded in the callback URL: `https://listener/c/{UUID}`
-3. **Callback Reception:** When payload executes, browser fetches the callback URL with the UUID
-4. **UUID Matching:** Correlation engine matches callback UUID with injected UUID (case-insensitive, normalized to lowercase)
-5. **Timestamp Validation:** Confirms callback timestamp > injection timestamp (within 24-hour expiry window)
-
-**Troubleshooting:**
-
-- **No correlations:** Check that target is actually vulnerable and callback server is reachable
-- **UUID mismatch:** UUID is extracted from HTTP request path; ensure listener captures it correctly
-- **Timeout:** Increase `--wait` flag to give payloads more time to execute (e.g., `--wait 120`)
-- **ML not available:** Train the model: `python bxss/ml/train_bxss.py` (requires 30+ baseline samples)
 
 ## Payload Categories
 

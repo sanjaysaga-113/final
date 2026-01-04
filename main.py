@@ -151,6 +151,9 @@ EXAMPLES:
 
     # Raw mode bypasses recon and accepts a sqlmap -r style request
     if args.raw:
+        if args.scan and args.scan != "sqli":
+            print_error("Raw mode currently supports only SQLi scanning.")
+            return
         try:
             from bsqli.core.raw_parser import parse_raw_request
             raw_req = parse_raw_request(args.raw)
@@ -158,77 +161,12 @@ EXAMPLES:
             print_error(f"Failed to parse raw request: {e}")
             return
 
-        # Default to SQLi if no scan type specified
-        scan_type = args.scan if args.scan else "sqli"
-
-        if scan_type == "sqli":
-            print_header("RAW SQLI SCAN MODE")
-            print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
-            module = BlindSQLiModule(timeout=10)
-            findings = module.scan_raw_request(raw_req)
-            write_outputs(findings)
-            logger.info("Raw scan complete. Total findings: %d", len(findings))
-        elif scan_type == "bxss":
-            if not args.listener:
-                print_error("BXSS raw scan requires --listener URL")
-                return
-            print_header("RAW BXSS SCAN MODE")
-            print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
-            print_info(f"Listener URL: {args.listener}")
-            
-            from bxss.modules.blind_xss.xss_module import BlindXSSModule
-            from bxss.oob.callback_server import start_server_background, get_callbacks
-            from bxss.oob.correlation import correlate_callbacks, calculate_confidence, save_findings
-            from urllib.parse import urlparse
-            
-            # Extract port from listener URL; default to 5000 if not specified
-            parsed_listener = urlparse(args.listener)
-            port = parsed_listener.port or 5000
-            
-            # Start callback server
-            print_info("Starting OOB callback server...")
-            server_thread = start_server_background(host='0.0.0.0', port=port)
-            time.sleep(2)
-            print_success("Callback server started")
-            
-            module = BlindXSSModule(listener_url=args.listener, timeout=10, wait_time=args.wait)
-            url = raw_req.get('url')
-            print_info(f"Scanning with {url}...")
-            
-            # For raw requests with POST data, extract form parameters if available
-            raw_body = raw_req.get('body', '')
-            injections = []
-            
-            # Try to scan as POST form if body exists
-            if raw_body:
-                try:
-                    form_data = dict(item.split('=') for item in raw_body.split('&') if '=' in item)
-                    print_info(f"Detected form parameters: {list(form_data.keys())}")
-                    injections = module.scan_post_form(url, form_data)
-                except Exception as e:
-                    logger.debug(f"Form parsing failed, scanning URL: {e}")
-                    injections = module.scan_url(url)
-            else:
-                # No body, scan URL query parameters
-                injections = module.scan_url(url)
-            
-            if injections:
-                # Record injections for correlation
-                from bxss.oob.correlation import record_injection
-                for inj in injections:
-                    record_injection(inj.get('uuid'), inj.get('url'), inj.get('parameter'), inj.get('payload'))
-                
-                callbacks = get_callbacks()
-                correlated = correlate_callbacks(callbacks)
-                for item in correlated:
-                    item['confidence'] = calculate_confidence(item)
-                findings = correlated
-                save_findings(findings)
-                print_success(f"Found {len(correlated)} correlated XSS injections")
-            else:
-                print_info("No XSS injections found")
-                findings = []
-        
+        print_header("RAW SQLI SCAN MODE")
+        print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
+        module = BlindSQLiModule(timeout=10)
+        findings = module.scan_raw_request(raw_req)
+        write_outputs(findings)
+        logger.info("Raw scan complete. Total findings: %d", len(findings))
         return
 
     if not args.url and not args.file:
@@ -290,15 +228,10 @@ EXAMPLES:
         from bxss.modules.blind_xss.xss_module import BlindXSSModule
         from bxss.oob.callback_server import start_server_background, get_callbacks
         from bxss.oob.correlation import correlate_callbacks, calculate_confidence, save_findings
-        from urllib.parse import urlparse
-        
-        # Extract port from listener URL; default to 5000 if not specified
-        parsed_listener = urlparse(args.listener)
-        port = parsed_listener.port or 5000
         
         # Start callback server in background
         print_info("Starting OOB callback server...")
-        server_thread = start_server_background(host='0.0.0.0', port=port)
+        server_thread = start_server_background(host='0.0.0.0', port=int(args.listener.split(':')[-1]))
         time.sleep(2)  # Give server time to start
         print_success("Callback server started")
         

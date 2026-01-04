@@ -39,9 +39,6 @@ class InjectionTracker:
         if timestamp is None:
             timestamp = datetime.utcnow().isoformat()
         
-        # Normalize UUID to lowercase for consistent matching
-        uuid = uuid.lower() if uuid else uuid
-        
         with self.lock:
             self.injections[uuid] = {
                 "uuid": uuid,
@@ -95,34 +92,18 @@ def correlate_callbacks(callbacks: List[Dict]) -> List[Dict]:
       - Callback timestamp > injection timestamp
       - Injection not expired (within INJECTION_EXPIRY_HOURS window)
     """
-    from bsqli.core.logger import get_logger
-    logger = get_logger("correlation")
-    
     findings = []
     now = datetime.utcnow()
     expiry_window = timedelta(hours=INJECTION_EXPIRY_HOURS)
-    
-    # Debug: Show tracked injections and received callbacks
-    all_injections = _injection_tracker.get_all_injections()
-    logger.info(f"[CORRELATION] Tracked injections: {len(all_injections)} | Received callbacks: {len(callbacks)}")
-    
-    tracked_uuids = set(all_injections.keys())
-    callback_uuids = {cb.get("uuid") for cb in callbacks if cb.get("uuid")}
-    logger.info(f"[CORRELATION] Tracked UUIDs sample: {list(tracked_uuids)[:3]}")
-    logger.info(f"[CORRELATION] Callback UUIDs sample: {list(callback_uuids)[:3]}")
     
     for callback in callbacks:
         uuid = callback.get("uuid", "")
         if not uuid:
             continue
         
-        # Normalize UUID to lowercase for consistent matching
-        uuid = uuid.lower()
-        
         injection = _injection_tracker.get_injection(uuid)
         if not injection:
             # Callback received but no matching injection (possibly from previous scan)
-            logger.debug(f"[CORRELATION] No matching injection for UUID: {uuid}")
             continue
         
         # Parse timestamps
@@ -133,13 +114,11 @@ def correlate_callbacks(callbacks: List[Dict]) -> List[Dict]:
         injection_age = now - injection_time
         if injection_age > expiry_window:
             # Injection too old - ignore callback
-            logger.debug(f"[CORRELATION] Injection expired (age={injection_age}): {uuid}")
             continue
         
         # Validate timestamp ordering
         if callback_time < injection_time:
             # Invalid: callback before injection (clock skew or error)
-            logger.debug(f"[CORRELATION] Callback before injection (skew): {uuid}")
             continue
         
         # Valid finding
@@ -160,7 +139,6 @@ def correlate_callbacks(callbacks: List[Dict]) -> List[Dict]:
         
         findings.append(finding)
         _injection_tracker.mark_correlated(uuid)
-        logger.info(f"[CORRELATION] Correlated: {uuid} | param={injection['parameter']} | delay={finding['delay_seconds']:.2f}s")
     
     return findings
 
