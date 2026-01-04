@@ -85,29 +85,6 @@ python main.py -f targets.txt --scan bxss --listener https://abc123.ngrok.io --w
 
 ---
 
-### 3b. SSRF Capability - Batch with ngrok
-
-**Detect SSRF-capable parameters using controlled OOB callbacks and behavioral inference**
-
-```bash
-# Terminal 1: start ngrok if needed
-ngrok http 5000
-
-# Terminal 2: run SSRF capability scan
-python main.py -f targets.txt --scan ssrf \
-  --listener https://abc123.ngrok.io \
-  --wait 90
-```
-
-**What it does:**
-- Confirms blind-capable endpoints via Active Recon (ingestion_vector_scores, async behavior)
-- Injects UUID-tagged HTTP(S) SSRF payloads (direct + redirect + unreachable controls)
-- Correlates callbacks and behavioral signals, writes report to `ssrf/output/findings.json`
-
-**Output:** `ssrf/output/findings.json` and `findings.txt`
-
----
-
 ### 4. Raw HTTP Request (sqlmap -r style)
 
 **Scan a specific HTTP request for SQLi**

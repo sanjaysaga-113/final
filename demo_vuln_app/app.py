@@ -103,7 +103,6 @@ def index():
           <li><a href="/search?name=alice">/search?name=alice</a> — SQL query with unsafe string concatenation</li>
           <li><a href="/comment?text=hello">/comment?text=hello</a> — Stores comments and reflects unsanitized</li>
           <li><a href="/comments">/comments</a> — List stored comments</li>
-                    <li><a href="/fetch?url=http://example.com">/fetch?url=</a> — SSRF demo: server-side fetch with redirects</li>
         </ul>
         <p>
           Time-based simulation: if the <code>name</code> parameter contains patterns like
@@ -171,25 +170,6 @@ def list_comments():
         <p><a href="/">Home</a></p>
         """
     )
-
-
-@app.route("/fetch")
-def fetch():
-    url = request.args.get("url")
-    if not url:
-        return "Missing url", 400
-
-    start = time.time()
-    try:
-        resp = requests.get(url, timeout=3, allow_redirects=True)
-        elapsed = time.time() - start
-        print(f"[FETCH] url={url} status={getattr(resp, 'status_code', None)} elapsed={elapsed:.2f}s")
-        return "Fetch attempted", 200
-    except Exception as e:
-        elapsed = time.time() - start
-        print(f"[FETCH] failed url={url} error={e} elapsed={elapsed:.2f}s")
-        return "Fetch failed", 500
-
 
 def run(host: str = "127.0.0.1", port: int = 8000):
     app.run(host=host, port=port, debug=False)

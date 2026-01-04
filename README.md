@@ -13,7 +13,6 @@
 5. [Module Documentation](#module-documentation)
    - [Blind SQLi Module](#blind-sqli-module)
    - [Blind XSS Module](#blind-xss-module)
-    - [SSRF Capability Module](#ssrf-capability-module)
    - [Reconnaissance](#reconnaissance)
    - [Machine Learning](#machine-learning)
 6. [Advanced Features](#advanced-features)
@@ -79,22 +78,6 @@ python main.py --raw post_request.txt --scan bxss \
   --listener https://abc123.ngrok.io --wait 120
 ```
 
-### Basic Scan (SSRF Capability)
-
-```bash
-# Controlled SSRF capability detection with OOB callbacks
-python main.py --scan ssrf \
-    -f targets.txt \
-    --listener https://abc123.ngrok.io \
-    --wait 90
-```
-
-What it does:
-- Runs Active Blind Recon per endpoint to confirm blind-capable behavior
-- Injects UUID-tagged SSRF payloads (HTTP/HTTPS + redirect + unreachable controls)
-- Correlates callbacks via shared OOB listener and infers behavioral signals (redirects, timing variance)
-- Writes explainable findings to `ssrf/output/findings.json`
-
 ---
 
 ## Architecture
@@ -136,16 +119,6 @@ final year project/
 │   │   └── train_bxss.py            # IsolationForest training
 │   └── output/                      # Callbacks DB, findings
 │
-├── ssrf/                            # Blind/Out-of-Band SSRF Capability Module
-│   ├── core/
-│   │   ├── payload_engine.py        # Controlled HTTP(S) SSRF payloads with UUIDs
-│   │   └── detector.py              # OOB + behavioral inference, decision traces
-│   ├── oob/
-│   │   └── listener.py              # Reuses BXSS callback server
-│   ├── ml/
-│   │   └── features.py              # Confidence-only scoring (no existence decision)
-│   └── output/                      # SSRF findings (JSON/TXT)
-│
 ├── recon/                           # Reconnaissance Module
 │   ├── gau_runner.py                # URL discovery (getallurls)
 │   ├── gf_filter.py                 # Pattern filtering + deduplication
@@ -169,7 +142,6 @@ gau → URLs → gf filter → Deduplicate (path+params) → Score params → Pr
     ↓
 SQLi: Boolean + Time-based → Multi-probe → Control payload → ML scoring
 BXSS: Inject payloads → OOB callback server → Correlation
-SSRF: UUID-tagged HTTP(S) callbacks → Behavioral inference → Decision traces
     ↓
 [3] ML ENHANCEMENT
     ↓
@@ -179,16 +151,6 @@ Feature extraction → Warm-up phase → Per-endpoint model → Hybrid scoring
     ↓
 JSON + TXT reports + Console summaries (highlighted payloads)
 ```
-
-#### SSRF Detection Flow (detailed)
-- Recon: gather parameterized URLs, compute `ingestion_vector_scores`, detect `endpoint_class`, note `async_behavior`.
-- Payloads: controlled HTTP/HTTPS with UUID in subdomain + query, redirector hops, unreachable controls; blacklist localhost/metadata/private IPs.
-- Injection: target SSRF-likely params (url/redirect/next/callback/webhook/fetch), rate-limited requests via shared HttpClient.
-- Signals: OOB callback correlation + behavioral (redirect_followed, timeout_variance, error_difference, worker_fetch_inference).
-- Scoring: confidence-only ML adjuster; tiers OOB (callback) vs EXPANDED (behavioral alignment); decision_trace logged per finding.
-- Output: `ssrf/output/findings.json|txt` with full signals and traces.
-
----
 
 ## Features Summary
 
@@ -204,12 +166,6 @@ JSON + TXT reports + Console summaries (highlighted payloads)
 | **Replay protection** | - | ✅ | UUID+IP deduplication |
 | **Async processing** | - | ✅ | Non-blocking callback queue |
 
-**SSRF Capability Highlights**
-- Controlled HTTP/HTTPS payloads with UUID query tags and attacker-owned subdomains
-- OOB correlation + behavioral inference (redirect_followed, timeout_variance, worker_fetch inference)
-- Ingestion vector confidence scores and endpoint_class drive payload prioritization
-- Decision traces and confidence-only ML scoring for explainability
-
 ### Machine Learning
 
 | Feature | Impact | Implementation |
@@ -222,11 +178,6 @@ JSON + TXT reports + Console summaries (highlighted payloads)
 | **UA fingerprint** (BXSS) | ⭐⭐⭐ 40% FP reduction | Browser vs bot detection |
 | **Callback repeat count** | ⭐⭐ Ground truth labeling | Multiple callbacks = higher confidence |
 | **Per-endpoint models** | ⭐⭐ 15-30% accuracy gain | Separate models for /login, /search, etc. |
-
-**SSRF confidence scorer (no existence decisions):**
-- Inputs: signal_count, ingestion_vector_scores (query/form/json/header), endpoint_class, async_behavior
-- Boosts: callback_received (major), redirect_followed + timeout_variance (cross-signal), worker_fetch_inference (minor)
-- Output: LOW / MEDIUM / HIGH + anomaly_score (0-1); ML is used only to tune confidence, not to assert SSRF
 
 **BXSS/SQLi models:**
 - IsolationForest for timing/anomaly signals; warm-up gate (N≥30) to reduce cold-start noise
@@ -403,61 +354,6 @@ CREATE TABLE callbacks (
 
 ---
 
-### SSRF Capability Module
-
-**Objective:** Detect SSRF capability safely using attacker-controlled HTTP(S) callbacks and behavioral inference (no internal probing or metadata hits).
-
-**Workflow**
-```
-[1] Active Recon → blind_capable flag, ingestion_vector_scores, endpoint_class
-[2] Payload Engine → http(s)://<uuid>.oob-domain/?id=<uuid>, redirector hops, unreachable controls
-[3] Injection → per-parameter UUID tagging, rate-limited HttpClient
-[4] Correlation → shared callback server (UUID match, replay protection)
-[5] Behavioral Signals → redirect_followed, timeout_variance, error_difference, worker_fetch_inference
-[6] Confidence (ML-assisted only) → LOW/MEDIUM/HIGH
-```
-
-**Safety Guardrails**
-- HTTP/HTTPS only; rejects localhost, loopback, link-local, and metadata hosts
-- No port scanning or brute-forcing protocols
-- Deterministic timeouts, per-host rate limiting, and decision traces for every finding
-
-**Finding Schema (ssrf/output/findings.json)**
-```
-url, parameter, payload, detection_tier (OOB|EXPANDED),
-signals, ingestion_vector_scores, endpoint_class,
-callback_time, confidence, decision_trace, detection_type
-```
-
-**Signals (what they mean)**
-- `callback_received`: server-side fetch hit our listener (CONFIRMED)
-- `redirect_followed`: server followed a redirect chain to another host
-- `timeout_variance`: unreachable/control payloads caused a slower response vs baseline
-- `error_difference`: error class differed between control and active payloads
-- `worker_fetch_inference`: unreachable + timeout variance hints at background fetcher
-
-**Detection tiers**
-- **OOB**: callback_received present (ground truth)
-- **EXPANDED**: strong behavioral signals without callback (LIKELY)
-
-**Local demo (vuln app)**
-```
-# Terminal 1: run demo app
-python demo_vuln_app/app.py --host 127.0.0.1 --port 8000
-
-# Terminal 2: start ngrok listener
-ngrok http 5000   # copy https URL
-
-# Terminal 3: run SSRF scan
-echo http://127.0.0.1:8000/fetch?url= > targets.txt
-python main.py --scan ssrf -f targets.txt --listener https://<NGROK_HTTPS> --wait 90
-
-# Results
-cat ssrf/output/findings.json
-```
-
----
-
 ### Reconnaissance
 
 **Wordlist requirement:** Active recon loads parameter candidates from [recon/wordlists/burp_parameter_names.txt](recon/wordlists/burp_parameter_names.txt) and will raise an error if the file is missing. Keep this file committed and present when cloning or deploying.
@@ -482,8 +378,6 @@ cat ssrf/output/findings.json
 urls_sorted = prioritize_urls(urls)
 # High-risk targets scanned first
 ```
-
-**Quality Signals:** Active recon now emits `ingestion_vector_scores` (0-1 floats instead of booleans), `endpoint_class` (auth/search/fetch/analytics/upload/generic), and `async_behavior` to drive payload selection and confidence scoring in SSRF detection.
 
 #### Smart Deduplication
 
