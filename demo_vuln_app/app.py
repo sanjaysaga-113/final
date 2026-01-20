@@ -103,6 +103,9 @@ def index():
           <li><a href="/search?name=alice">/search?name=alice</a> — SQL query with unsafe string concatenation</li>
           <li><a href="/comment?text=hello">/comment?text=hello</a> — Stores comments and reflects unsanitized</li>
           <li><a href="/comments">/comments</a> — List stored comments</li>
+          <li><a href="/fetch_image?url=http://google.com">/fetch_image?url=...</a> — SSRF via image URL parameter</li>
+          <li><a href="/webhook?callback=http://localhost:8080">/webhook?callback=...</a> — SSRF via webhook callback parameter</li>
+          <li><a href="/fetch_file?file=http://localhost:8000">/fetch_file?file=...</a> — SSRF via file fetch parameter</li>
         </ul>
         <p>
           Time-based simulation: if the <code>name</code> parameter contains patterns like
@@ -170,6 +173,154 @@ def list_comments():
         <p><a href="/">Home</a></p>
         """
     )
+
+
+# ============================================
+# SSRF Vulnerable Endpoints (for BSSRF demo)
+# ============================================
+
+@app.route("/fetch_image")
+def fetch_image():
+    """
+    SSRF vulnerability: fetches an image from user-supplied URL.
+    Vulnerable parameter: 'url'
+    """
+    url = request.args.get("url", "")
+    
+    if not url:
+        return jsonify({
+            "error": "Missing 'url' parameter",
+            "example": "/fetch_image?url=http://example.com/image.jpg"
+        })
+    
+    print(f"[SSRF] fetch_image endpoint received URL: {url}")
+    
+    try:
+        # VULNERABLE: directly fetch from user-supplied URL without validation
+        response = requests.get(url, timeout=5)
+        print(f"[SSRF] Fetched from {url}: status={response.status_code}")
+        
+        # Simulate storing the fetched image metadata
+        return jsonify({
+            "status": "success",
+            "url": url,
+            "status_code": response.status_code,
+            "content_length": len(response.content),
+            "message": "Image fetched and would be stored (vulnerable to SSRF)"
+        })
+    except requests.exceptions.Timeout:
+        print(f"[SSRF] Timeout fetching {url}")
+        return jsonify({
+            "status": "timeout",
+            "url": url,
+            "message": "Request timed out (possible SSRF to slow/blocked endpoint)"
+        }), 504
+    except Exception as e:
+        print(f"[SSRF] Error fetching {url}: {e}")
+        return jsonify({
+            "status": "error",
+            "url": url,
+            "error": str(e)
+        }), 400
+
+
+@app.route("/webhook")
+def webhook():
+    """
+    SSRF vulnerability: registers a webhook callback URL.
+    Vulnerable parameter: 'callback'
+    
+    Simulates a service that will make requests to the callback URL.
+    """
+    callback = request.args.get("callback", "")
+    event = request.args.get("event", "user.created")
+    
+    if not callback:
+        return jsonify({
+            "error": "Missing 'callback' parameter",
+            "example": "/webhook?callback=http://attacker.com/hook&event=user.created"
+        })
+    
+    print(f"[SSRF] webhook endpoint received callback: {callback}")
+    
+    try:
+        # VULNERABLE: server will make requests to user-supplied callback
+        # Simulate the server making a callback request
+        print(f"[SSRF] Simulating webhook trigger to {callback}")
+        response = requests.post(callback, 
+                                json={"event": event, "timestamp": time.time()},
+                                timeout=5)
+        print(f"[SSRF] Callback response: {response.status_code}")
+        
+        return jsonify({
+            "status": "registered",
+            "callback": callback,
+            "event": event,
+            "callback_status": response.status_code,
+            "message": "Webhook registered and would be triggered (vulnerable to SSRF)"
+        })
+    except requests.exceptions.Timeout:
+        print(f"[SSRF] Webhook timeout to {callback}")
+        return jsonify({
+            "status": "timeout",
+            "callback": callback,
+            "message": "Webhook callback timed out (possible SSRF)"
+        }), 504
+    except Exception as e:
+        print(f"[SSRF] Webhook error: {e}")
+        return jsonify({
+            "status": "error",
+            "callback": callback,
+            "error": str(e)
+        }), 400
+
+
+@app.route("/fetch_file")
+def fetch_file():
+    """
+    SSRF vulnerability: fetches content from a user-supplied file URL.
+    Vulnerable parameter: 'file'
+    
+    Could be used to access internal services, metadata endpoints, etc.
+    """
+    file_url = request.args.get("file", "")
+    
+    if not file_url:
+        return jsonify({
+            "error": "Missing 'file' parameter",
+            "example": "/fetch_file?file=http://internal-server:8080/admin"
+        })
+    
+    print(f"[SSRF] fetch_file endpoint received: {file_url}")
+    
+    try:
+        # VULNERABLE: fetch file from user-supplied URL
+        response = requests.get(file_url, timeout=5)
+        print(f"[SSRF] Fetched file from {file_url}: status={response.status_code}")
+        
+        # Would parse and process the file
+        return jsonify({
+            "status": "success",
+            "file_url": file_url,
+            "status_code": response.status_code,
+            "content_length": len(response.content),
+            "message": "File fetched and processed (vulnerable to SSRF)"
+        })
+    except requests.exceptions.Timeout:
+        print(f"[SSRF] File fetch timeout from {file_url}")
+        return jsonify({
+            "status": "timeout",
+            "file_url": file_url,
+            "message": "File fetch timed out (possible SSRF)"
+        }), 504
+    except Exception as e:
+        print(f"[SSRF] File fetch error: {e}")
+        return jsonify({
+            "status": "error",
+            "file_url": file_url,
+            "error": str(e)
+        }), 400
+
 
 def run(host: str = "127.0.0.1", port: int = 8000):
     app.run(host=host, port=port, debug=False)

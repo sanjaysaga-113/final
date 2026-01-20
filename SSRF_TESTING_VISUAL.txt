@@ -1,0 +1,164 @@
+SSRF TESTING ON DEMO APP - QUICK VISUAL GUIDE
+==============================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│                     SETUP COMPLETE ✅                           │
+│                                                                  │
+│  Files Created:                                                  │
+│  ✓ demo_vuln_app/urls_ssrf.txt     (3 test endpoints)          │
+│  ✓ test_ssrf_demo.sh               (automated test script)      │
+│  ✓ SSRF_TEST_QUICKSTART.md         (quick reference)           │
+│  ✓ SSRF_TESTING_GUIDE.md           (detailed guide)            │
+│  ✓ SSRF_TEST_START_HERE.md         (this guide)                │
+└─────────────────────────────────────────────────────────────────┘
+
+
+OPTION A: AUTOMATED TEST (RECOMMENDED)
+═══════════════════════════════════════════════════════════════════
+
+  $ chmod +x test_ssrf_demo.sh
+  $ ./test_ssrf_demo.sh
+
+  ↓ Script will:
+    1. Start demo app on port 8000
+    2. Run SSRF scan
+    3. Show results
+    4. Clean up
+    5. Exit
+
+
+OPTION B: MANUAL TEST
+═══════════════════════════════════════════════════════════════════
+
+  Terminal 1:
+  $ cd demo_vuln_app
+  $ python app.py --port 8000 &
+  $ cd ..
+
+  Terminal 2:
+  $ python main.py --scan ssrf \
+    -f demo_vuln_app/urls_ssrf.txt \
+    --listener http://127.0.0.1:5000 \
+    --wait 30 --threads 2
+
+
+WHAT WILL HAPPEN
+═══════════════════════════════════════════════════════════════════
+
+  Demo App (8000)                  BSSRF Scanner               Callback Server (5000)
+      │                                   │                           │
+      │  GET /fetch_image?url=UUID       │                           │
+      ├────────────────────────────────→ │                           │
+      │                                   │  POST http://127.0.0.1:5000/callback
+      │  ← Makes request to callback      ├───────────────────────────→
+      │                                   │                           │
+      │                                   │  Callback received ✓      │
+      │                                   │  Stored in DB ✓           │
+      │                                   │  ← UUID match ✓           │
+      │                                   │                           │
+      │                                   └─ VULNERABLE DETECTED ✓   │
+      │                                   │  (repeat for other URLs)  │
+      │                                   │                           │
+
+
+EXPECTED RESULTS
+═══════════════════════════════════════════════════════════════════
+
+  Total Vulnerabilities Found: 3
+
+  ┌─────────────────────────────────────┐
+  │ /fetch_image?url=                   │  ✓ VULNERABLE (100%)
+  │ Parameter: url                      │  ✓ OOB Callback Received
+  │ Type: SSRF                          │
+  └─────────────────────────────────────┘
+
+  ┌─────────────────────────────────────┐
+  │ /webhook?callback=                  │  ✓ VULNERABLE (100%)
+  │ Parameter: callback                 │  ✓ OOB Callback Received
+  │ Type: SSRF                          │
+  └─────────────────────────────────────┘
+
+  ┌─────────────────────────────────────┐
+  │ /fetch_file?file=                   │  ✓ VULNERABLE (100%)
+  │ Parameter: file                     │  ✓ OOB Callback Received
+  │ Type: SSRF                          │
+  └─────────────────────────────────────┘
+
+
+VIEW RESULTS
+═══════════════════════════════════════════════════════════════════
+
+  # Pretty-print JSON results
+  $ cat bssrf/output/findings_ssrf.json | jq .
+
+  # View callbacks received
+  $ curl http://127.0.0.1:5000/api/callbacks | jq .
+
+  # View text summary
+  $ cat bssrf/output/findings_ssrf.txt
+
+
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+
+  Port 8000 already in use?
+  $ lsof -i :8000
+  $ kill -9 <PID>
+
+  Port 5000 already in use?
+  $ python main.py --scan bssrf \
+    -f demo_vuln_app/urls_ssrf.txt \
+    --listener http://127.0.0.1:6000 \
+    --wait 30
+
+  App not starting?
+  $ cat /tmp/demo_app.log
+
+  No results?
+  $ curl http://127.0.0.1:8000/  # verify app is running
+
+
+NO NGROK NEEDED!
+═══════════════════════════════════════════════════════════════════
+
+  ✓ Both app and scanner are on localhost
+  ✓ No internet exposure needed
+  ✓ Perfect for local testing
+  ✓ Fast execution
+  ✓ Isolated testing environment
+
+
+🚀 GET STARTED
+═══════════════════════════════════════════════════════════════════
+
+  Quickest way:
+  $ chmod +x test_ssrf_demo.sh && ./test_ssrf_demo.sh
+
+  Or manual:
+  $ cd demo_vuln_app && python app.py --port 8000 & && cd .. && sleep 3
+  $ python main.py --scan bssrf -f demo_vuln_app/urls_ssrf.txt --listener http://127.0.0.1:5000 --wait 30 --threads 2
+
+
+NEXT STEPS AFTER TESTING
+═══════════════════════════════════════════════════════════════════
+
+  1. ✓ Verify 3 vulnerabilities detected
+  2. ✓ Review findings in JSON format
+  3. ✓ Check callback server logs
+  4. ✓ Explore bssrf/ module code
+  5. ✓ Try with advanced payloads (--advanced flag)
+  6. ✓ Test with --recon for endpoint discovery
+
+
+FOR MORE INFO
+═══════════════════════════════════════════════════════════════════
+
+  Quick reference:  SSRF_TEST_QUICKSTART.md
+  Detailed guide:   SSRF_TESTING_GUIDE.md
+  Project guide:    README.md
+
+
+═══════════════════════════════════════════════════════════════════
+                    Ready to test? Run:
+                    ./test_ssrf_demo.sh
+═══════════════════════════════════════════════════════════════════

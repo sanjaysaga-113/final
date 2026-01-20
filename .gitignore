@@ -1,0 +1,106 @@
+# ============================================================================
+# Python Environment & Cache
+# ============================================================================
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================================================
+# IDE & Editor
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# ============================================================================
+# Generated Output Artifacts (IMPORTANT: Do NOT version these)
+# ============================================================================
+# JSON findings files
+**/output/*.json
+findings*.json
+
+# Text reports
+**/output/*.txt
+findings*.txt
+
+# CSV feature files
+**/output/*.csv
+features.csv
+
+# SQLite databases
+*.db
+callbacks.db
+injections.db
+
+# Callback artifacts
+**/output/callbacks.json
+**/output/callbacks.txt
+
+# ============================================================================
+# Temporary & Log Files
+# ============================================================================
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+logs/
+
+# ============================================================================
+# System & OS Files
+# ============================================================================
+.DS_Store
+Thumbs.db
+*.bak
+nul
+
+# ============================================================================
+# Project-Specific Files
+# ============================================================================
+# Cache and credential files
+.env
+.env.local
+credentials.json
+tokens/
+
+# Temp test artifacts
+demo_data/
+test_*.out
