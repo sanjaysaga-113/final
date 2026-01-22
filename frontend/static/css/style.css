@@ -180,16 +180,19 @@ body {
 @media (min-width: 1200px) {
     .main-content {
         grid-template-columns: 500px 1fr;
-        grid-auto-rows: 1fr;
+        grid-template-rows: 550px 550px;
         gap: var(--spacing-xl);
     }
     
     .config-panel {
         grid-column: 1;
-        grid-row: 1;
+        grid-row: 1 / 3;
         display: flex;
         flex-direction: column;
         min-height: 0;
+        max-height: 1116px;
+        height: 1116px;
+        overflow: hidden;
     }
     
     .terminal-panel {
@@ -198,6 +201,9 @@ body {
         display: flex;
         flex-direction: column;
         min-height: 0;
+        max-height: 550px;
+        height: 550px;
+        overflow: hidden;
     }
     
     .results-panel {
@@ -206,6 +212,9 @@ body {
         display: flex;
         flex-direction: column;
         min-height: 0;
+        max-height: 550px;
+        height: 550px;
+        overflow: hidden;
     }
 }
 
@@ -221,6 +230,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
 }
 
 .panel-title {
@@ -263,7 +273,14 @@ body {
 .config-panel form {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: var(--spacing-sm);
+    min-height: 0;
+}
+
+.config-panel .button-group {
+    flex-shrink: 0;
+    margin-top: var(--spacing-lg);
 }
 
 /* ============================================================================
@@ -658,7 +675,8 @@ body {
     font-size: 0.85rem;
     line-height: 1.5;
     overflow-y: auto;
-    min-height: 200px;
+    overflow-x: hidden;
+    min-height: 0;
 }
 
 .terminal-line {
@@ -743,7 +761,7 @@ body {
     flex: 1;
     overflow-x: auto;
     overflow-y: auto;
-    min-height: 200px;
+    min-height: 0;
 }
 
 .empty-state {

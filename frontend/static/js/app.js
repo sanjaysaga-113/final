@@ -648,9 +648,11 @@ function logToTerminal(level, message, timestamp = null) {
     
     elements.terminal.appendChild(terminalLine);
     
-    // Auto-scroll if enabled
+    // Auto-scroll to bottom if enabled (use requestAnimationFrame for smooth scroll)
     if (autoScroll) {
-        elements.terminal.scrollTop = elements.terminal.scrollHeight;
+        requestAnimationFrame(() => {
+            elements.terminal.scrollTop = elements.terminal.scrollHeight;
+        });
     }
 }
 
