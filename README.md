@@ -53,22 +53,35 @@ Dependencies: Python 3.8+, requests, Flask (demo app), scikit-learn (ML stubs). 
 
 ## Quick Start
 
-SQLi (direct URL or file)
-- `python main.py -u "https://target/search?q=test" --scan sqli --threads 5`
-- `python main.py -f targets.txt --scan sqli --threads 10`
+All modules accept either a single URL (`-u`) or a file of targets (`-f file.txt`, one URL per line). For POST/JSON bodies, supply a raw request file (`--raw request.txt`, sqlmap `-r` style) to replay the exact method/headers/body and inject into body fields.
+
+SQLi
+- URL: `python main.py -u "https://target/search?q=test" --scan sqli --threads 5`
+- File: `python main.py -f targets.txt --scan sqli --threads 10`
+- POST/JSON via raw file: `python main.py --raw demo_raw_request.txt --scan sqli --threads 5`
 
 BXSS (requires listener)
-- `python main.py -f targets.txt --scan bxss --listener http://127.0.0.1:5000 --wait 60 --threads 2`
+- URL: `python main.py -u "https://target/profile?name=x" --scan bxss --listener http://127.0.0.1:5000 --wait 60 --threads 2`
+- File: `python main.py -f targets.txt --scan bxss --listener http://127.0.0.1:5000 --wait 60 --threads 2`
 
 SSRF (requires listener)
-- `python main.py -f targets.txt --scan ssrf --listener http://127.0.0.1:5000 --wait 30 --threads 5`
+- URL: `python main.py -u "https://target/fetch?url=https://example.com" --scan ssrf --listener http://127.0.0.1:5000 --wait 30 --threads 5`
+- File: `python main.py -f targets.txt --scan ssrf --listener http://127.0.0.1:5000 --wait 30 --threads 5`
 
 CMDi
-- `python main.py -u "https://target/ping?host=1" --scan cmdi --listener http://127.0.0.1:5000 --threads 5`
+- URL: `python main.py -u "https://target/ping?host=1" --scan cmdi --listener http://127.0.0.1:5000 --threads 5`
+- File: `python main.py -f targets.txt --scan cmdi --listener http://127.0.0.1:5000 --threads 5`
 
-XXE
-- `python main.py -u "https://target/api/parse?x=1" --scan xxe --threads 5`
-- Raw: `python main.py --raw demo_raw_request.txt --scan xxe --listener http://127.0.0.1:5000`
+Blind XXE
+- URL: `python main.py -u "https://target/api/parse?x=1" --scan xxe --threads 5`
+- File: `python main.py -f targets.txt --scan xxe --threads 5`
+- POST/JSON via raw file: `python main.py --raw demo_raw_request.txt --scan xxe --listener http://127.0.0.1:5000`
+
+How `--raw request.txt` is used (POST/JSON/XML)
+- File format: full HTTP request (method, path, headers, body) like sqlmap `-r`.
+- The scanner preserves method, headers, and body exactly, then injects into query, form, or JSON fields extracted from the body.
+- `Content-Type` controls parsing (e.g., `application/json`, `application/x-www-form-urlencoded`, `xml`).
+- Works best for SQLi and XXE where body parameters matter; BXSS/SSRF/CMDi prefer `-u`/`-f` with query/form parameters.
 
 Recon (optional)
 - Add `--recon --recon-mode passive|active` to discover URLs first.
