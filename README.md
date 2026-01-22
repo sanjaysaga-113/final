@@ -98,15 +98,32 @@ Tests
 
 ## Architecture
 
-- main.py: CLI router, recon control flow, module dispatch
-- recon/: gau + gf filtering + param scoring
-- bsqli/: HTTP client, payload engines, detectors, ML stub
-- bxss/, bssrf/: payload engines, OOB callback server + correlation
-- bcmdi/: time-based command injection detector
-- bxe/: blind XXE detector (OOB/time/behavior)
-- demo_vuln_app/: Flask test bed with vulnerable endpoints
+**Control Flow**
+- `main.py` parses CLI, chooses module, wires recon → scan → reporting.
+- Recon (optional) collects URLs, scores parameters, deduplicates signatures.
+- Scheduler fans out work via ThreadPool (size from `--threads`).
+- Each module injects payloads, measures responses/callbacks, computes confidence, writes findings.
 
-Flow: Recon (optional) → Parallel scan via ThreadPool → Findings persisted (JSON/TXT) → Console summaries.
+**Core Components**
+- `recon/`: gau wrapper + gf filters, parameter scorer, dedup (path+param-name signature), feeds target queue.
+- `bsqli/core/`: HTTP client, payload engine, detector (boolean/time, control payloads, multi-probe), ML stub (IsolationForest).
+- `bxss/` and `bssrf/`: payload engines + OOB callback server (Flask), SQLite persistence, async processing queue, correlation engine (UUID match + replay protection).
+- `bcmdi/`: time-based, OS-aware payload families, separators, control payloads, jitter handling.
+- `bxe/`: XXE payload families (OOB/time/parser-behavior), jitter controls, optional callback use.
+- `demo_vuln_app/`: Flask vulnerable endpoints for SQLi/XSS/SSRF/CMDi/XXE testing.
+
+**Data & Persistence**
+- Findings: module-specific `output/findings.{json,txt}` (includes evidence and ML/confidence fields).
+- Callbacks: SQLite DB + JSON (`bxss`/`bssrf`) for correlation and replay protection.
+
+**Execution Model**
+- HTTP client enforces timeouts; retries and control payloads guard against slow servers.
+- OOB modules auto-start callback server in a daemon thread using the listener port.
+- Per-request evidence captured: timing deltas, linear-fit score, jitter stats, callback UUIDs, headers.
+
+**Extensibility Points**
+- Add modules by implementing payload engine + detector + output writer; register in `main.py` dispatch.
+- Per-endpoint ML models supported (e.g., `auth`, `search`) for tighter anomaly boundaries.
 
 ---
 
