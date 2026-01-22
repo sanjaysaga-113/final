@@ -13,6 +13,8 @@ from bsqli.core.config import OUTPUT_DIR
 from colorama import Fore, Back, Style
 
 logger = get_logger("main")
+from bcmdi.modules.blind_cmdi.cmdi_module import BlindCMDiModule
+from bxe.modules.blind_xxe.xxe_module import BlindXXEModule
 
 def print_header(text):
     """Print a colored header."""
@@ -137,8 +139,8 @@ EXAMPLES:
     )
     ap.add_argument(
         "--scan",
-        choices=["sqli", "bxss", "ssrf"],
-        help="Scan module: 'sqli' for Blind SQL Injection, 'bxss' for Blind XSS, 'ssrf' for Blind SSRF",
+            choices=["sqli", "bxss", "ssrf", "cmdi", "xxe"],
+            help="Scan module: 'sqli' for Blind SQL Injection, 'bxss' for Blind XSS, 'ssrf' for Blind SSRF, 'cmdi' for Blind Command Injection, 'xxe' for Blind XXE",
         required=False
     )
     ap.add_argument(
@@ -167,8 +169,8 @@ EXAMPLES:
 
     # Raw mode bypasses recon and accepts a sqlmap -r style request
     if args.raw:
-        if args.scan and args.scan != "sqli":
-            print_error("Raw mode currently supports only SQLi scanning.")
+        if args.scan and args.scan not in ["sqli", "xxe"]:
+            print_error("Raw mode currently supports SQLi and XXE scanning.")
             return
         try:
             from bsqli.core.raw_parser import parse_raw_request
@@ -177,12 +179,21 @@ EXAMPLES:
             print_error(f"Failed to parse raw request: {e}")
             return
 
-        print_header("RAW SQLI SCAN MODE")
-        print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
-        module = BlindSQLiModule(timeout=10)
-        findings = module.scan_raw_request(raw_req)
-        write_outputs(findings)
-        logger.info("Raw scan complete. Total findings: %d", len(findings))
+        if args.scan == "xxe":
+            print_header("RAW XXE SCAN MODE")
+            print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
+            module = BlindXXEModule(timeout=15, oast_server=args.listener if args.listener else None)
+            result = module.scan_raw_request(raw_req)
+            findings = [result] if result else []
+            write_outputs(findings)
+            logger.info("Raw XXE scan complete. Total findings: %d", len(findings))
+        else:
+            print_header("RAW SQLI SCAN MODE")
+            print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
+            module = BlindSQLiModule(timeout=10)
+            findings = module.scan_raw_request(raw_req)
+            write_outputs(findings)
+            logger.info("Raw scan complete. Total findings: %d", len(findings))
         return
 
     if not args.url and not args.file and not args.raw:
@@ -194,7 +205,7 @@ EXAMPLES:
         return
     
     # BXSS and SSRF require listener URL
-    if args.scan in ["bxss", "ssrf"] and not args.listener:
+    if args.scan in ["bxss", "ssrf", "cmdi"] and not args.listener:
         print_error(f"{args.scan.upper()} scan requires --listener URL")
         print("Examples:")
         print("  --listener https://abc123.ngrok.io     (use ngrok)")
@@ -502,6 +513,196 @@ EXAMPLES:
         print_success(f"Results saved to {json_path} and {txt_path}")
         print_info(f"Callback server running on {args.listener}")
         logger.info("SSRF scan complete. Total injection points: %d", len(all_findings))
+
+    elif args.scan == "cmdi":
+        print_header("BLIND COMMAND INJECTION SCAN MODE")
+        print_info(f"Listener URL: {args.listener}")
+        if args.recon:
+            print_info(f"[RECON] Mode: {args.recon_mode} | URLs discovered: {len(urls)}")
+        else:
+            print_info(f"[*] Recon disabled | Target URLs: {len(urls)}")
+    
+        # Import CMDi callback server
+        from bcmdi.oob.callback_server import start_server_background
+    
+        # Extract port from listener URL
+        try:
+            listener_port = int(args.listener.split(':')[-1])
+        except (ValueError, IndexError):
+            listener_port = 5000
+    
+        # Start callback server in background
+        print_info("Starting OOB callback server...")
+        server_thread = start_server_background(host='0.0.0.0', port=listener_port)
+        time.sleep(2)  # Give server time to start
+        print_success("Callback server started")
+    
+        # Initialize CMDi module
+        print_info("Initializing Command Injection detector...")
+        module = BlindCMDiModule(listener_url=args.listener, timeout=10, wait_time=5)
+    
+        all_findings = []
+        print_info(f"Starting CMDi scan with {args.threads} threads...")
+    
+        with ThreadPoolExecutor(max_workers=args.threads) as exe:
+            futures = {exe.submit(module.scan_url, u): u for u in urls}
+            for fut in as_completed(futures):
+                try:
+                    findings_list = fut.result()
+                    if findings_list:
+                        all_findings.extend(findings_list)
+                        print(f"{Fore.MAGENTA}[CMDi] {futures[fut]}: {len(findings_list)} injection points{Style.RESET_ALL}")
+                except Exception as e:
+                    logger.debug(f"Scan task error: {e}")
+    
+        print_success(f"Scan complete: {len(all_findings)} total CMDi injection points")
+    
+        # Wait for delayed callbacks
+        print_info(f"Waiting {args.wait}s for OOB callbacks...")
+        module.wait_for_callbacks(timeout=args.wait)
+    
+        # Correlate callbacks with findings
+        confirmed_findings = []
+        for finding in all_findings:
+            uuid = finding.get('uuid')
+            callback_received = uuid and module.check_callback_received(uuid)
+            
+            if callback_received:
+                finding['confirmed'] = True
+                finding['vulnerability_status'] = 'CONFIRMED'
+                finding['confirmation_reason'] = 'Callback received'
+                confirmed_findings.append(finding)
+            else:
+                finding['confirmed'] = False
+                finding['vulnerability_status'] = 'POTENTIAL'
+                finding['confirmation_reason'] = 'No callback received'
+    
+        # Display results
+        if all_findings:
+            print_success(f"Scan Results: {len(all_findings)} injection points tested")
+            print_success(f"Confirmed Vulnerabilities: {len(confirmed_findings)}")
+            
+            if confirmed_findings:
+                print(f"\n{Fore.GREEN}{'='*80}")
+                print(f"CONFIRMED VULNERABLE ENDPOINTS (Callbacks Received)")
+                print(f"{'='*80}{Style.RESET_ALL}\n")
+                
+                for idx, finding in enumerate(confirmed_findings, 1):
+                    print(f"{Fore.GREEN}✓ [{idx}] {finding.get('url')}{Style.RESET_ALL}")
+                    print(f"  Parameter: {Fore.YELLOW}{finding.get('parameter')}{Style.RESET_ALL}")
+                    print(f"  Technique: {finding.get('technique', 'time-based')}")
+                    print(f"  Confidence: {Fore.GREEN}100%{Style.RESET_ALL}")
+                    print()
+        else:
+            print_info("No CMDi-vulnerable parameters found in the scanned URLs.")
+    
+        # Save findings to output
+        os.makedirs(os.path.join("bcmdi", "output"), exist_ok=True)
+        json_path = os.path.join("bcmdi", "output", "findings_cmdi.json")
+        txt_path = os.path.join("bcmdi", "output", "findings_cmdi.txt")
+    
+        with open(json_path, "w") as f:
+            json.dump(all_findings, f, indent=2)
+    
+        with open(txt_path, "w") as f:
+            f.write("=" * 80 + "\n")
+            f.write("BLIND COMMAND INJECTION DETECTION FINDINGS\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Total injection points found: {len(all_findings)}\n")
+            f.write(f"Confirmed vulnerabilities: {len(confirmed_findings)}\n")
+            f.write(f"Scan timestamp: {datetime.now().isoformat()}\n")
+            f.write(f"Callback Server: {args.listener}\n\n")
+            
+            if confirmed_findings:
+                f.write("\nCONFIRMED VULNERABLE ENDPOINTS:\n")
+                f.write("-" * 80 + "\n")
+                for idx, finding in enumerate(confirmed_findings, 1):
+                    f.write(f"\n[CONFIRMED #{idx}]\n")
+                    f.write(f"URL: {finding.get('url')}\n")
+                    f.write(f"Parameter: {finding.get('parameter')}\n")
+                    f.write(f"Technique: {finding.get('technique', 'unknown')}\n")
+                    f.write(f"Confidence: 100%\n")
+    
+        print_success(f"Results saved to {json_path} and {txt_path}")
+        print_info(f"Callback server running on {args.listener}")
+        logger.info("CMDi scan complete. Total injection points: %d", len(all_findings))
+
+    elif args.scan == "xxe":
+        print_header("BLIND XXE SCAN MODE")
+        if args.recon:
+            print_info(f"[RECON] Mode: {args.recon_mode} | URLs discovered: {len(urls)}")
+        else:
+            print_info(f"[*] Recon disabled | Target URLs: {len(urls)}")
+    
+        # Initialize XXE module
+        print_info("Initializing XXE detector...")
+        module = BlindXXEModule(timeout=15, oast_server=args.listener if args.listener else None)
+    
+        all_findings = []
+        print_info(f"Starting XXE scan with {args.threads} threads...")
+    
+        with ThreadPoolExecutor(max_workers=args.threads) as exe:
+            futures = {exe.submit(module.scan_url, u): u for u in urls}
+            for fut in as_completed(futures):
+                try:
+                    findings_list = fut.result()
+                    if findings_list:
+                        all_findings.extend(findings_list)
+                        print(f"{Fore.MAGENTA}[XXE] {futures[fut]}: {len(findings_list)} injection points{Style.RESET_ALL}")
+                except Exception as e:
+                    logger.debug(f"Scan task error: {e}")
+    
+        print_success(f"Scan complete: {len(all_findings)} total XXE injection points")
+    
+        # Filter for confirmed XXE findings
+        confirmed_findings = [f for f in all_findings if f.get('is_vulnerable')]
+    
+        # Display results
+        if confirmed_findings:
+            print(f"\n{Fore.GREEN}{'='*80}")
+            print(f"CONFIRMED XXE VULNERABILITIES")
+            print(f"{'='*80}{Style.RESET_ALL}\n")
+            
+            for idx, finding in enumerate(confirmed_findings, 1):
+                print(f"{Fore.GREEN}✓ [{idx}] {finding.get('endpoint')}{Style.RESET_ALL}")
+                print(f"  Parameter: {Fore.YELLOW}{finding.get('parameter')}{Style.RESET_ALL}")
+                print(f"  Technique: {finding.get('technique', 'unknown')}")
+                print(f"  Confidence: {finding.get('confidence', 'unknown').upper()}")
+                print(f"  ML Score: {finding.get('ml_score', 0):.2f}")
+                print()
+        else:
+            print_info("No XXE vulnerabilities confirmed in the scanned URLs.")
+    
+        # Save findings to output
+        os.makedirs(os.path.join("bxe", "output"), exist_ok=True)
+        json_path = os.path.join("bxe", "output", "findings_xxe.json")
+        txt_path = os.path.join("bxe", "output", "findings_xxe.txt")
+    
+        with open(json_path, "w") as f:
+            json.dump(all_findings, f, indent=2)
+    
+        with open(txt_path, "w") as f:
+            f.write("=" * 80 + "\n")
+            f.write("BLIND XXE DETECTION FINDINGS\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Total injection points found: {len(all_findings)}\n")
+            f.write(f"Confirmed vulnerabilities: {len(confirmed_findings)}\n")
+            f.write(f"Scan timestamp: {datetime.now().isoformat()}\n\n")
+            
+            if confirmed_findings:
+                f.write("CONFIRMED VULNERABLE ENDPOINTS:\n")
+                f.write("-" * 80 + "\n")
+                for idx, finding in enumerate(confirmed_findings, 1):
+                    f.write(f"\n[CONFIRMED #{idx}]\n")
+                    f.write(f"Endpoint: {finding.get('endpoint')}\n")
+                    f.write(f"Parameter: {finding.get('parameter')}\n")
+                    f.write(f"Technique: {finding.get('technique', 'unknown')}\n")
+                    f.write(f"Confidence: {finding.get('confidence', 'unknown')}\n")
+                    f.write(f"ML Score: {finding.get('ml_score', 0)}\n")
+                    f.write(f"Details: {finding.get('payload', 'N/A')}\n")
+    
+        print_success(f"Results saved to {json_path} and {txt_path}")
+        logger.info("XXE scan complete. Total injection points: %d", len(all_findings))
 
     else:  # sqli (default)
         logger.info("================================================================================")

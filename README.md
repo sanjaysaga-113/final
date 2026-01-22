@@ -1,115 +1,218 @@
-# Blind SQL Injection, XSS & SSRF Detection Framework - Complete Documentation
+# Web Vulnerability Scanner (SQLi, XSS, SSRF, CMDi, XXE)
 
-**Final Year Project | Production-Grade Security Scanner**
+Production-grade blind vulnerability scanner with five modules, recon, ML-assisted scoring, WAF evasion, and a vulnerable demo app. This README is the primary document for managers and engineers.
 
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
-2. [Quick Start](#quick-start)
-3. [When to Use ngrok](#when-to-use-ngrok-and-when-you-dont)
-4. [What's New](#whats-new-january-5-2026)
-5. [Architecture](#architecture)
-6. [Features Summary](#features-summary)
-7. [Module Documentation](#module-documentation)
-   - [Blind SQLi Module](#blind-sqli-module)
-   - [Blind XSS Module](#blind-xss-module)
-   - [Blind SSRF Module](#blind-ssrf-module)
-   - [Reconnaissance](#reconnaissance)
-   - [Machine Learning](#machine-learning)
-8. [Usage Examples](#usage-examples)
-9. [Advanced Features](#advanced-features)
-10. [Testing & Validation](#testing--validation)
-11. [Thesis Defense Talking Points](#thesis-defense-talking-points)
+- [Project Overview](#project-overview)
+- [Quick Start](#quick-start)
+- [When to Use ngrok](#when-to-use-ngrok-and-when-you-dont)
+- [What's New](#whats-new-recent-updates)
+- [Architecture](#architecture)
+- [Features Summary](#features-summary)
+- [Module Documentation](#module-documentation)
+    - [Blind SQLi Module](#blind-sqli-module)
+    - [Blind XSS Module](#blind-xss-module)
+    - [Blind XXE Module](#blind-xxe-module)
+    - [Blind SSRF Module](#blind-ssrf-module)
+    - [Blind CMD Injection Module](#blind-cmd-injection-module)
+    - [Reconnaissance](#reconnaissance)
+    - [Machine Learning](#machine-learning)
+- [Usage Examples](#usage-examples)
+- [Advanced Features](#advanced-features)
+- [Testing & Validation](#testing--validation)
+- [Thesis Defense Talking Points](#thesis-defense-talking-points)
 
 ---
 
-## Project Overview
+## Module Matrix
 
-A production-grade automated scanner for detecting **Blind SQL Injection**, **Blind XSS**, and **Blind SSRF** vulnerabilities with ML-enhanced accuracy and WAF evasion capabilities.
+| Module | Techniques | OOB? | ML | Output | Key Paths |
+|--------|-----------|------|----|--------|-----------|
+| SQLi | Boolean, time-based, multi-probe, controls | No | Yes | bsqli/output/findings.* | bsqli/modules/blind_sqli/
+| BXSS | OOB callbacks (HTTP), UUID correlation | Yes | Stub | bxss/output/findings_xss.* | bxss/modules/blind_xss/
+| SSRF | OOB callbacks (HTTP/DNS), injection tracking | Yes | No | bssrf/output/findings_ssrf.* | bssrf/modules/blind_ssrf/
+| CMDi | Time-based, OS-aware, controls | Optional | Stub | bcmdi/output/findings_cmdi.* | bcmdi/modules/blind_cmdi/
+| XXE | OOB (HTTP/DNS), time-based, parser behavior, controls | Optional | Yes | bxe/output/findings_xxe.* | bxe/modules/blind_xxe/
 
-### Key Innovations
+---
 
-✅ **ML-Enhanced Detection** - IsolationForest with delta_ratio normalization (40-60% accuracy gain)  
-✅ **Production Callback Server** - SQLite persistence, replay protection, async processing, automatic startup  
-✅ **Automatic OOB Server** - Callback server launches in background when running BXSS/BSSRF scans (zero manual setup)  
-✅ **Triple-Threat Coverage** - SQL Injection, XSS, and SSRF detection in one framework  
-✅ **WAF Evasion** - Adaptive rate limiting, header rotation, payload obfuscation  
-✅ **False Positive Reduction** - Multi-probe confirmation, control payloads, jitter analysis  
-✅ **Smart Reconnaissance** - Parameter scoring, path+param deduplication, context detection  
+## Install & Environment
+
+```bash
+cd "final year project"
+pip install -r requirements.txt
+python main.py --help
+```
+
+Dependencies: Python 3.8+, requests, Flask (demo app), scikit-learn (ML stubs). Keep recon/wordlists/burp_parameter_names.txt in place.
 
 ---
 
 ## Quick Start
 
-### Installation
+SQLi (direct URL or file)
+- `python main.py -u "https://target/search?q=test" --scan sqli --threads 5`
+- `python main.py -f targets.txt --scan sqli --threads 10`
 
-```bash
-# Clone repository
-cd "final year project"
+BXSS (requires listener)
+- `python main.py -f targets.txt --scan bxss --listener http://127.0.0.1:5000 --wait 60 --threads 2`
 
-# Install dependencies
-pip install -r requirements.txt
+SSRF (requires listener)
+- `python main.py -f targets.txt --scan ssrf --listener http://127.0.0.1:5000 --wait 30 --threads 5`
 
-# Verify installation
-python main.py --help
-```
+CMDi
+- `python main.py -u "https://target/ping?host=1" --scan cmdi --listener http://127.0.0.1:5000 --threads 5`
 
-### Basic Scan (SQLi)
+XXE
+- `python main.py -u "https://target/api/parse?x=1" --scan xxe --threads 5`
+- Raw: `python main.py --raw demo_raw_request.txt --scan xxe --listener http://127.0.0.1:5000`
 
-```bash
-# Scan with recon
-python main.py --recon -u example.com --scan sqli --threads 5
+Recon (optional)
+- Add `--recon --recon-mode passive|active` to discover URLs first.
 
-# Scan from URL file
-python main.py --scan sqli -f targets.txt --threads 5
+Demo app
+- Start: `python demo_vuln_app/app.py --port 8000`
+- Run XXE harness: `python test_xxe_against_demo_app.py`
 
-# Raw request mode (sqlmap -r style)
-python main.py --raw demo_raw_request.txt
-```
+Tests
+- Core SQLi/others: `python -m pytest tests`
+- XXE suite: `python test_xxe_integration.py`
 
-### Basic Scan (Blind XSS)
+---
 
-```bash
-# Callback server starts automatically in background!
-python main.py --scan bxss \
-  -f targets.txt \
-  --listener http://YOUR_PUBLIC_IP:5000 \
-  --wait 60
-# [INFO] Starting OOB callback server...
-# [SUCCESS] Callback server started
-```
+## Architecture
 
-### Basic Scan (Blind SSRF)
+- main.py: CLI router, recon control flow, module dispatch
+- recon/: gau + gf filtering + param scoring
+- bsqli/: HTTP client, payload engines, detectors, ML stub
+- bxss/, bssrf/: payload engines, OOB callback server + correlation
+- bcmdi/: time-based command injection detector
+- bxe/: blind XXE detector (OOB/time/behavior)
+- demo_vuln_app/: Flask test bed with vulnerable endpoints
 
-```bash
-# Callback server starts automatically in background!
-python main.py --scan bssrf \
-  -f targets.txt \
-  --listener http://YOUR_PUBLIC_IP:5000 \
-  --wait 30 \
-  --threads 5
-# [INFO] Starting OOB callback server...
-# [SUCCESS] Callback server started
+Flow: Recon (optional) → Parallel scan via ThreadPool → Findings persisted (JSON/TXT) → Console summaries.
 
-# With recon (discover URLs first)
-python main.py --recon -u example.com \
-  --scan bssrf \
-  --listener http://YOUR_PUBLIC_IP:5000 \
-  --wait 30
-```
+---
 
-> **📚 Complete Documentation:** All guides, examples, and reference information is consolidated in this README.
+## Outputs
 
-### When to Use ngrok (and When You Don't)
+- bsqli/output/findings.{json,txt}
+- bxss/output/findings_xss.{json,txt}, callbacks.json/db
+- bssrf/output/findings_ssrf.{json,txt}
+- bcmdi/output/findings_cmdi.{json,txt}
+- bxe/output/findings_xxe.{json,txt}
+
+Each finding includes type, parameter/endpoint, technique, confidence, evidence, and (where present) ML score/features.
+
+---
+
+## Module Highlights
+
+### SQLi
+- Boolean + time-based with multi-probe (3/5/7) and linear scaling
+- Control payloads to weed out slow servers
+- ML features: delta_ratio, jitter variance, entropy
+
+### BXSS
+- UUID-tagged payloads across query, body, headers
+- Flask OOB callback server with SQLite + replay protection
+- Correlation engine matches callbacks to injections; confidence based on repeats
+
+### SSRF
+- HTTP/DNS payloads, callback correlation, injection tracking
+- Protocol variety (HTTP/DNS/FTP/Gopher/file)
+- Confidence: callback received or HTTP success to listener
+
+### CMDi
+- OS-aware payload families (sleep/timeout/ping)
+- Baseline + time-based scaling + control payloads
+- Confidence via multi-confirmation; optional OOB future-ready
+
+### XXE
+- Techniques: OOB (HTTP/DNS), time-based (/dev/random, entity expansion), parser behavior
+- Baseline (3 samples) with jitter tolerance; control payloads for FP reduction
+- Inputs: XML bodies, SOAP, JSON-embedded XML, file uploads
+- ML features: response time, delta_ratio, std_dev_ratio, status, control_passed, technique_count
+
+---
+
+## Usage Cheatsheet (common flags)
+
+- `--scan {sqli,bxss,ssrf,cmdi,xxe}`
+- `--listener URL` (required for bxss/ssrf/cmdi; optional for xxe when OOB used)
+- `--threads N` (parallelism; keep low for OOB modules)
+- `--wait N` (seconds to wait for callbacks)
+- `--recon` + `--recon-mode passive|active` (URL discovery)
+- `--raw file.txt` (sqlmap-style request; supports sqli and xxe)
+
+---
+
+## Demo App
+
+Located at demo_vuln_app/app.py with endpoints for SQLi, BXSS, SSRF, CMDi, and XXE. Use only locally.
+
+Quick start:
+- `python demo_vuln_app/app.py --port 8000`
+- Example BXSS target list: demo_vuln_app/urls_bxss.txt
+- Example SQLi target list: demo_vuln_app/urls_sqli.txt
+- Example SSRF target list: demo_vuln_app/urls_ssrf.txt
+- Example XXE harness: `python test_xxe_against_demo_app.py`
+
+---
+
+## Testing
+
+- Unit/integ: `python -m pytest tests`
+- XXE suite: `python test_xxe_integration.py`
+- CMDi: `python test_cmdi_integration.py`
+- Demo harnesses: `python test_xxe_against_demo_app.py`, `python test_cmdi_against_demo_app.py`
+
+---
+
+## Documentation Map
+
+- README.md (this file) – overview, commands, modules, outputs
+- QUICKSTART.md – operator cheat sheet
+- PROJECT_GUIDE.md – contributor notes, integration/testing checklist
+- Module READMEs – per-module usage and internals (bxss, bssrf, bcmdi, bxe)
+- demo_vuln_app/README.md – demo endpoints and steps
+
+Redundant inventories/summaries removed for clarity.
+
+---
+
+## Responsible Use
+
+Only scan targets you are authorized to test. Modules include safety measures (control payloads, bounded delays), but always adhere to ethical and legal guidelines.
+
+---
+
+## Project Overview
+
+A production-grade automated scanner for detecting **Blind SQL Injection**, **Blind XSS**, **Blind SSRF**, **Blind Command Injection**, and **Blind XXE** vulnerabilities with ML-enhanced accuracy and WAF evasion capabilities.
+
+### Key Innovations
+
+✅ **ML-Enhanced Detection** - IsolationForest with delta_ratio normalization (40-60% accuracy gain)  
+✅ **Production Callback Server** - SQLite persistence, replay protection, async processing, automatic startup  
+✅ **Five Module Coverage** - SQLi, XSS, SSRF, CMDi, XXE detection in one framework  
+✅ **WAF Evasion** - Adaptive rate limiting, header rotation, payload obfuscation  
+✅ **False Positive Reduction** - Multi-probe confirmation, control payloads, jitter analysis  
+✅ **Smart Reconnaissance** - Parameter scoring, path+param deduplication, context detection
+
+---
+
+## When to Use ngrok (and When You Don't)
 
 | Scenario | Need ngrok? | Command | Example |
 |----------|-------------|---------|---------|
 | **SQLi Detection** | ❌ NO | `python main.py --scan sqli -f targets.txt --threads 5` | No callbacks, no external URL needed |
-| **BXSS/BSSRF - Local Testing** | ❌ NO | `python main.py --scan bxss -f targets.txt --listener http://localhost:5000 --wait 60` | Target is `localhost` or internal IP |
-| **BXSS/BSSRF - External Target** | ✅ YES | `ngrok http 5000` then `python main.py --scan bxss -f targets.txt --listener https://abc123.ngrok.io --wait 60` | Target can't reach your machine; needs public URL |
-| **BXSS/BSSRF - Remote Server** | ✅ YES | `ngrok http 5000` then `python main.py --scan bssrf -u example.com --listener https://abc123.ngrok.io --wait 30` | Targets external servers; needs public callback URL |
+| **BXSS/SSRF - Local Testing** | ❌ NO | `python main.py --scan bxss -f targets.txt --listener http://localhost:5000 --wait 60` | Target is `localhost` or internal IP |
+| **BXSS/SSRF - External Target** | ✅ YES | `ngrok http 5000` then `python main.py --scan bxss -f targets.txt --listener https://abc123.ngrok.io --wait 60` | Target can't reach your machine; needs public URL |
+| **CMDi/XXE - Remote Server** | ✅ YES | `ngrok http 5000` then `python main.py --scan xxe -u example.com --listener https://abc123.ngrok.io --wait 30` | Targets external servers; needs public callback URL |
 
 **Quick Decision Tree:**
 ```
@@ -119,27 +222,13 @@ python main.py --recon -u example.com \
 4. Testing from cloud/remote? → Use ngrok! ✅
 ```
 
-**Example Workflow:**
-```bash
-# Terminal 1: Start ngrok (if needed)
-ngrok http 5000
-# Output: Forwarding https://abc123.ngrok.io -> http://localhost:5000
-
-# Terminal 2: Run scan with ngrok URL
-python main.py --scan bxss \
-  -f external_targets.txt \
-  --listener https://abc123.ngrok.io \
-  --wait 60
-# Callback server still starts automatically!
-```
-
 ---
 
-## What's New (January 5, 2026)
+## What's New (Recent Updates)
 
 ### ✨ Automatic Callback Server Startup
 
-Both BXSS and BSSRF modules now start their callback servers **automatically in the background** when you run a scan—no manual setup required!
+BXSS, BSSRF, CMDi, and XXE modules now start their callback servers **automatically in the background** when you run a scan—no manual setup required!
 
 **Before (Old Way):**
 ```bash
@@ -162,121 +251,26 @@ python main.py --scan bssrf -f targets.txt --listener http://attacker.com:5000 -
 - ✅ SQLite database initializes automatically
 - ✅ Async callback processing queue starts automatically
 - ✅ 2-second grace period allows Flask to initialize
-- ✅ Callback collection happens during scan
-- ✅ Results saved to `bxss/output/` or `bssrf/output/`
 - ✅ Fully backward compatible (manual startup still works)
 
-**What Changed:**
-- `bssrf/oob/callback_server.py` - Added `start_server_background()` function
-- `main.py` - Integrated auto-startup into BSSRF scan section
-- Documentation updated to reflect automatic startup behavior
-
-See [Usage Examples](#usage-examples) section below for complete command reference.
-
 ---
-
-## Architecture
-
-### Directory Structure
-
-```
-final year project/
-├── main.py                          # CLI entry point
-├── requirements.txt                 # Dependencies
-│
-├── bsqli/                           # Blind SQLi Module
-│   ├── core/
-│   │   ├── config.py                # Global configuration
-│   │   ├── http_client.py           # HTTP client with rate limiting
-│   │   ├── header_pool.py           # User-Agent rotation (11 profiles)
-│   │   ├── logger.py                # Colored logging
-│   │   └── response_analyzer.py     # Timing & similarity analysis
-│   ├── modules/blind_sqli/
-│   │   ├── detector.py              # Boolean, time-based, multi-probe, control payload
-│   │   ├── payload_engine.py        # Data-driven payload generation
-│   │   └── payloads.py              # Basic + advanced payloads (JSON, Unicode, CSP, mXSS)
-│   ├── ml/
-│   │   └── anomaly_stub.py          # IsolationForest with warm-up phase
-│   └── output/                      # Findings, features, models
-│
-├── bxss/                            # Blind XSS Module
-│   ├── core/
-│   │   └── payload_engine.py        # UUID-tagged payload generation
-│   ├── modules/blind_xss/
-│   │   ├── detector.py              # Black-box injection
-│   │   ├── payloads.py              # 40+ context-aware templates
-│   │   └── xss_module.py            # Orchestration layer
-│   ├── oob/
-│   │   ├── callback_server.py       # SQLite + async processing
-│   │   └── correlation.py           # UUID matching with expiration
-│   ├── ml/
-│   │   ├── features.py              # Feature extraction (time_bucket, ua_fingerprint)
-│   │   └── train_bxss.py            # IsolationForest training
-│   └── output/                      # Callbacks DB, findings
-│
-├── bssrf/                           # Blind SSRF Module
-│   ├── core/
-│   │   └── payload_engine.py        # SSRF payload generation
-│   ├── modules/blind_ssrf/
-│   │   ├── detector.py              # SSRF injection detector
-│   │   ├── payloads.py              # SSRF payload templates (HTTP/DNS/FTP/etc)
-│   │   └── ssrf_module.py           # Orchestration layer
-│   ├── oob/
-│   │   ├── callback_server.py       # SQLite + async processing + replay protection
-│   │   └── correlation.py           # UUID matching with expiration + injection tracking
-│   └── output/                      # Callbacks DB, injections DB, findings
-│
-├── recon/                           # Reconnaissance Module
-│   ├── gau_runner.py                # URL discovery (getallurls)
-│   ├── gf_filter.py                 # Pattern filtering + deduplication
-│   ├── param_scorer.py              # Parameter risk scoring
-│   └── recon_manager.py             # Orchestration
-│
-├── demo_vuln_app/                   # Test application
-│   └── app.py                       # Flask vulnerable app
-│
-└── docs/ (this file)                # Consolidated documentation
-```
-
-### Data Flow
-
-```
-[1] RECON
-    ↓
-gau → URLs → gf filter → Deduplicate (path+params) → Score params → Prioritize
-    ↓
-[2] DETECTION
-    ↓
-SQLi: Boolean + Time-based → Multi-probe → Control payload → ML scoring
-BXSS: Inject payloads → OOB callback server → Correlation
-BSSRF: Inject SSRF payloads → OOB callbacks → Correlation + IP enrichment
-    ↓
-[3] ML ENHANCEMENT
-    ↓
-Feature extraction → Warm-up phase → Per-endpoint model → Hybrid scoring
-    ↓
-[4] OUTPUT
-    ↓
-JSON + TXT reports + Console summaries (highlighted payloads)
-```
 
 ## Features Summary
 
 ### Core Detection
 
-| Feature | BSQLI | BXSS | BSSRF | Description |
-|---------|-------|------|-------|-------------|
-| **Boolean-based** | ✅ | - | - | TRUE/FALSE payload pairs |
-| **Time-based** | ✅ | - | - | SLEEP/WAITFOR delays |
-| **Multi-probe** | ✅ | - | - | Linear scaling verification |
-| **Control payload** | ✅ | - | - | Slow server detection |
-| **OOB callbacks** | - | ✅ | ✅ | UUID-tagged HTTP callbacks |
-| **Replay protection** | - | ✅ | ✅ | UUID+IP deduplication |
-| **Async processing** | - | ✅ | ✅ | Non-blocking callback queue |
-| **Protocol variety** | - | - | ✅ | HTTP/DNS/FTP/Gopher/DICT/file |
-| **Injection tracking** | - | - | ✅ | SQLite persistence with expiry |
-| **Context enrichment** | - | - | ✅ | Headers, X-Forwarded-For, IP |
-
+| Feature | BSQLI | BXSS | BSSRF | CMDi | XXE | Description |
+|---------|-------|------|-------|------|-----|-------------|
+| **Boolean-based** | ✅ | - | - | - | - | TRUE/FALSE payload pairs |
+| **Time-based** | ✅ | - | - | ✅ | ✅ | SLEEP/WAITFOR/timeout delays |
+| **Multi-probe** | ✅ | - | - | ✅ | ✅ | Linear scaling verification (3/5/7) |
+| **Control payload** | ✅ | - | - | ✅ | ✅ | Slow server detection |
+| **OOB callbacks** | - | ✅ | ✅ | Optional | ✅ | UUID-tagged HTTP/DNS callbacks |
+| **Replay protection** | - | ✅ | ✅ | ✅ | ✅ | UUID+IP deduplication |
+| **Async processing** | - | ✅ | ✅ | ✅ | ✅ | Non-blocking callback queue |
+| **Protocol variety** | - | - | ✅ | - | ✅ | HTTP/DNS/FTP/Gopher/file |
+| **Parser behavior** | - | - | - | - | ✅ | Status/length/error analysis |
+| **OS-aware** | - | - | - | ✅ | - | Linux/Windows payload families |
 
 ### Machine Learning
 
@@ -291,10 +285,6 @@ JSON + TXT reports + Console summaries (highlighted payloads)
 | **Callback repeat count** | ⭐⭐ Ground truth labeling | Multiple callbacks = higher confidence |
 | **Per-endpoint models** | ⭐⭐ 15-30% accuracy gain | Separate models for /login, /search, etc. |
 
-**BXSS/SQLi models:**
-- IsolationForest for timing/anomaly signals; warm-up gate (N≥30) to reduce cold-start noise
-- Per-endpoint models encouraged (e.g., auth/search/fetch) to reduce variance across contexts
-
 ### WAF Evasion
 
 | Feature | Description |
@@ -305,20 +295,6 @@ JSON + TXT reports + Console summaries (highlighted payloads)
 | **Payload obfuscation** | Case flips, comments, HTML entities, URL encode |
 | **Smart deduplication** | Path+param_names only (ignores values) |
 | **Parameter scoring** | Prioritize high-risk params (id, user, search) |
-
-### Advanced Payloads
-
-**SQLi:**
-- JSON-based: `{"$ne": null}`
-- Unicode comments: `\u002d\u002d`
-- Subquery timing: `(SELECT SLEEP(5))`
-- DB-specific: MySQL, MSSQL, PostgreSQL, Oracle
-
-**XSS:**
-- CSP bypass: JSONP, base href, link prefetch
-- Framework-specific: AngularJS, React, Vue
-- mXSS: Mutation XSS via backticks, entities
-- UUID in path: `/callback/{uuid}/x.js`
 
 ---
 
@@ -369,7 +345,6 @@ else:
 ```
 
 #### Configuration
-
 ```python
 # bsqli/core/config.py
 DEFAULT_TIMEOUT = 10              # HTTP timeout
@@ -380,13 +355,20 @@ WARMUP_THRESHOLD = 30             # ML warm-up samples
 ```
 
 #### ML Features (13 total)
-
 ```
 timestamp, url, parameter, injection_type, payload,
 baseline_time, injected_time, delta, delta_ratio,
 content_length, status_code, response_entropy,
 jitter_variance, endpoint_class
 ```
+
+#### Advanced Payloads
+
+**SQLi:**
+- JSON-based: `{"$ne": null}`
+- Unicode comments: `\u002d\u002d`
+- Subquery timing: `(SELECT SLEEP(5))`
+- DB-specific: MySQL, MSSQL, PostgreSQL, Oracle
 
 ---
 
@@ -464,6 +446,12 @@ CREATE TABLE callbacks (
 6. **CSP bypass** (8 variants)
 7. **Framework-specific** (Angular/React/Vue)
 
+**XSS Examples:**
+- CSP bypass: JSONP, base href, link prefetch
+- Framework-specific: AngularJS, React, Vue
+- mXSS: Mutation XSS via backticks, entities
+- UUID in path: `/callback/{uuid}/x.js`
+
 ---
 
 ### Blind SSRF Module
@@ -487,13 +475,13 @@ Inject into parameters (id, url, redirect, proxy, etc.)
     ↓
 Flask listener on 0.0.0.0:5000
     ↓
-Async processing queue (decouple HTTP receive from processing)
+Async processing queue
     ↓
 SQLite persistence (callbacks survive restarts)
     ↓
 Replay protection (UUID+IP deduplication)
     ↓
-Context enrichment (full headers, X-Forwarded-For, etc.)
+Context enrichment (full headers, X-Forwarded-For)
 
 [3] CORRELATE
     ↓
@@ -503,74 +491,10 @@ Validate: callback_time > injection_time
     ↓
 Check: injection age < 24h (expiry TTL)
     ↓
-Extract context (source IP, User-Agent, headers)
-    ↓
 Calculate confidence (LOW/MEDIUM/HIGH)
-
-[4] ML SCORING
-    ↓
-Extract features (response time, source IP, callback count)
-    ↓
-Score with IsolationForest (anomaly detection)
-    ↓
-Add ml_confidence to findings
 ```
 
-#### Callback Server Features
-
-**SQLite Schema (Production-Grade):**
-```sql
-CREATE TABLE callbacks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    uuid TEXT,                    -- Injected UUID
-    remote_addr TEXT,             -- Source IP
-    path TEXT,                    -- Request path
-    method TEXT,                  -- HTTP method
-    headers TEXT,                 -- JSON blob
-    query_string TEXT,            -- URL params
-    user_agent TEXT,              -- User-Agent header
-    full_url TEXT,                -- Complete URL
-    replay_hash TEXT UNIQUE       -- MD5(uuid+ip) for dedup
-);
-
-CREATE TABLE injections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    uuid TEXT UNIQUE,             -- Injection UUID
-    timestamp TEXT NOT NULL,      -- Injection time
-    url TEXT NOT NULL,            -- Target URL
-    parameter TEXT NOT NULL,      -- Parameter name
-    payload TEXT,                 -- SSRF payload
-    payload_type TEXT,            -- http/dns/ftp/gopher/dict/file
-    expires_at TEXT               -- Expiration timestamp
-);
-```
-
-**Performance:**
-- HTTP response: <5ms (async queue)
-- Throughput: 100+ callbacks/sec
-- Replay protection: O(1) database lookup
-- Injection lookup: Indexed on uuid
-
-**API Endpoints:**
-```bash
-# List all callbacks
-GET /api/callbacks
-
-# Check specific UUID
-GET /api/check/<uuid>
-
-# Clear callbacks (testing)
-POST /api/clear
-
-# Health check
-GET /health
-
-# Catch all callbacks
-GET|POST|PUT|DELETE /* 
-```
-
-#### Payload Types & Strategies
+#### Payload Strategies
 
 **1. HTTP/HTTPS Callbacks (Primary)**
 ```
@@ -585,34 +509,23 @@ Path-based:
          http://attacker.com/ssrf/{uuid}
 ```
 
-**2. FTP Callbacks**
+**2. Alternative Protocols**
 ```
-ftp://attacker.com/?id={uuid}
-ftp://anonymous@attacker.com/?id={uuid}
-```
-
-**3. DNS Lookups**
-```
-http://{uuid}.attacker.com
-http://{uuid}.ssrf.attacker.com
-Nslookup triggers DNS query → callback in logs
+FTP:     ftp://attacker.com/?id={uuid}
+DNS:     http://{uuid}.attacker.com
+Gopher:  gopher://localhost:9000/_
+Dict:    dict://localhost:6379/
+File:    file:///etc/passwd
 ```
 
-**4. Alternative Protocols**
-```
-gopher://localhost:9000/_    (port scanning)
-dict://localhost:6379/       (Redis)
-file:///etc/passwd           (local file access)
-```
-
-**5. Cloud Metadata Services**
+**3. Cloud Metadata Services**
 ```
 AWS:      http://169.254.169.254/latest/meta-data/
 Azure:    http://169.254.169.254/metadata/instance
 GCP:      http://metadata.google.internal/computeMetadata/v1/
 ```
 
-**6. WAF Bypass Techniques**
+**4. WAF Bypass Techniques**
 ```
 Double slash:     http:////localhost/
 Dot encoding:     http://localho%252e%252est/
@@ -621,51 +534,106 @@ IP hex:           http://0x7f000001/
 IP integer:       http://2130706433/
 Mixed case:       hTtP://lOcAlHoSt/
 At symbol:        http://attacker@localhost/
-Hash fragment:    http://127.0.0.1#localhost/
-Question mark:    http://127.0.0.1?localhost/
 ```
 
 #### Parameter Targeting
 
 **High-Risk SSRF Parameters:**
 ```python
-# Definitely SSRF
 'url', 'link', 'target', 'callback', 'webhook', 'image', 'avatar',
 'redirect', 'next', 'file', 'fetch', 'fetch_url', 'uri', 'endpoint',
-'host', 'server', 'proxy', 'request_url', 'notification_url', 'return_url',
-'imageUrl', 'profileUrl', 'downloadUrl', 'documentUrl', 'resourceUrl'
-
-# Medium-risk (context-dependent)
-'q', 'search', 'page', 'source', 'data'
+'host', 'server', 'proxy', 'request_url', 'notification_url'
 ```
-
-**Injection Points:**
-```python
-- Query parameters: ?url=payload
-- JSON body: {"url": "payload"}
-- XML body: <url>payload</url>
-- Headers: X-Forwarded-For, Referer, User-Agent
-- Path segments: /proxy/{payload}
-```
-
-#### Blind SSRF vs Reflected SSRF
-
-| Aspect | Blind SSRF | Reflected SSRF |
-|--------|-----------|----------------|
-| **Response Visibility** | None (OOB callbacks required) | Direct error/response |
-| **Detection Method** | UUID correlation | Pattern matching |
-| **Time to Confirm** | Seconds (wait for callback) | Immediate |
-| **Error Handling** | Backend failures hidden | Errors visible |
-| **Difficulty** | Harder (requires OOB setup) | Easier (direct output) |
 
 ---
 
-### Reconnaissance
+### Blind CMD Injection Module
 
-**Wordlist requirement:** Active recon loads parameter candidates from [recon/wordlists/burp_parameter_names.txt](recon/wordlists/burp_parameter_names.txt) and will raise an error if the file is missing. Keep this file committed and present when cloning or deploying.
+#### Detection Techniques
 
+**Time-Based with OS Detection:**
+```python
+# Linux payloads
+sleep 3
+sleep 5
+sleep 7
 
-#### Parameter Scoring
+# Windows payloads
+timeout /t 3
+timeout /t 5
+ping -n 4 127.0.0.1  # ~3 seconds
+```
+
+**Separators:**
+```
+; && || | %0a (newline) %26 (URL-encoded &)
+```
+
+**Control Payloads:**
+```python
+sleep 0          # Should not delay
+invalid_cmd_xyz  # Should not delay
+```
+
+#### Configuration
+```python
+BASELINE_SAMPLES = 3          # Baseline measurements
+MIN_CONFIRMATIONS = 2         # Independent separator confirmations
+TIME_JITTER_TOLERANCE = 1.5   # Multiplier for std dev
+LATENCY_THRESHOLD = 2.5       # Minimum delta threshold
+```
+
+---
+
+### Blind XXE Module
+
+#### Detection Techniques
+
+**1. Out-of-Band (OAST)**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "http://callback.attacker.com/abc123">
+]>
+<foo>&xxe;</foo>
+```
+
+**2. Time-Based**
+```xml
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///dev/random">
+]>
+<foo>&xxe;</foo>
+<!-- Blocks parser waiting for random data (~3-5s) -->
+```
+
+**3. Parser Behavior**
+- Status code changes (200 → 400/500)
+- Response size deviations
+- XML parser error messages
+
+#### Input Vectors
+- XML request bodies
+- SOAP web services
+- JSON with embedded XML
+- File uploads (SVG, XML, Office docs)
+- Multipart form data
+
+#### Configuration
+```python
+BASELINE_SAMPLES = 3
+MIN_TIME_CONFIRMATIONS = 2
+TIME_JITTER_TOLERANCE = 1.5
+LATENCY_THRESHOLD = 2.5
+MIN_BODY_CHANGE = 50  # bytes
+HTTP_TIMEOUT = 15
+```
+
+---
+
+## Reconnaissance
+
+### Parameter Scoring
 
 ```python
 # High-risk params (score 10)
@@ -678,13 +646,7 @@ Question mark:    http://127.0.0.1?localhost/
 'sort', 'order', 'limit', 'offset'
 ```
 
-**Prioritization:**
-```python
-urls_sorted = prioritize_urls(urls)
-# High-risk targets scanned first
-```
-
-#### Smart Deduplication
+### Smart Deduplication
 
 **Old behavior:**
 ```
@@ -701,11 +663,13 @@ http://site.com/page?id=2  → dropped (duplicate signature)
 
 **Impact:** 60-80% reduction in scan volume
 
+**Wordlist requirement:** Active recon loads parameter candidates from `recon/wordlists/burp_parameter_names.txt` and will raise an error if the file is missing.
+
 ---
 
-### Machine Learning
+## Machine Learning
 
-#### Algorithm: IsolationForest
+### Algorithm: IsolationForest
 
 **Why IsolationForest?**
 - Unsupervised (no labels required)
@@ -729,7 +693,7 @@ score = model.predict(features)[0]
 #  1 = normal (likely benign)
 ```
 
-#### ML + Rule Hybrid
+### ML + Rule Hybrid
 
 | ML Score | Linear Delay | Final Confidence |
 |----------|--------------|------------------|
@@ -738,7 +702,7 @@ score = model.predict(features)[0]
 | LOW (1) | TRUE | MEDIUM |
 | LOW (1) | FALSE | LOW |
 
-#### Alternatives (For Thesis)
+### Alternatives (For Thesis)
 
 **HBOS (Histogram-Based Outlier Score)**
 - Faster than IsolationForest
@@ -757,82 +721,62 @@ score = model.predict(features)[0]
 
 ## Usage Examples
 
-### SQL Injection (SQLi) Scanning
+### SQL Injection Scanning
 
 ```bash
-# Basic scan with file input
+# Basic scan
 python main.py --scan sqli -f targets.txt --threads 5
 
-# Scan with recon (discovers URLs first)
+# With recon
 python main.py --recon -u example.com --scan sqli --threads 5
 
 # Raw request mode (sqlmap -r format)
 python main.py --raw demo_raw_request.txt
-
-# Advanced payloads (JSON, Unicode, etc.)
-python main.py --scan sqli -f targets.txt --threads 5 --advanced
 ```
 
-### Blind XSS (BXSS) Scanning
+### Blind XSS Scanning
 
 ```bash
-# Basic BXSS scan (callback server starts automatically)
+# Basic BXSS (callback server auto-starts)
 python main.py --scan bxss -f targets.txt --listener http://YOUR_IP:5000 --wait 60
 
-# With ngrok for external targets
+# With ngrok
 ngrok http 5000 &
 python main.py --scan bxss -f targets.txt --listener https://abc123.ngrok.io --wait 60
 
 # With recon
 python main.py --recon -u example.com --scan bxss --listener http://YOUR_IP:5000 --wait 60
-
-# Advanced payloads + multi-threaded
-python main.py --scan bxss -f targets.txt --listener http://YOUR_IP:5000 --wait 60 --threads 5 --advanced
 ```
 
-### Blind SSRF (BSSRF) Scanning
+### Blind SSRF Scanning
 
 ```bash
-# Basic BSSRF scan (callback server starts automatically)
+# Basic BSSRF (callback server auto-starts)
 python main.py --scan bssrf -f targets.txt --listener http://YOUR_IP:5000 --wait 30 --threads 5
 
-# With recon (discovers URLs)
-python main.py --recon -u example.com --scan bssrf --listener http://YOUR_IP:5000 --wait 30
-
-# With ngrok for external targets
+# With ngrok
 ngrok http 5000 &
-python main.py --scan bssrf -f targets.txt --listener https://abc123.ngrok.io --wait 30 --threads 5
-
-# Advanced SSRF (cloud metadata, internal services, etc.)
-python main.py --scan bssrf -f targets.txt --listener http://YOUR_IP:5000 --wait 30 --advanced
+python main.py --scan bssrf -f targets.txt --listener https://abc123.ngrok.io --wait 30
 ```
 
-### Recon-Only Mode
+### CMDi Scanning
 
 ```bash
-# Discover all endpoints
-python main.py --recon -u example.com
+# Basic CMDi
+python main.py --scan cmdi -u "https://target/ping?host=1" --listener http://127.0.0.1:5000
 
-# Save URLs to file
-python main.py --recon -u example.com > discovered_urls.txt
-
-# Find high-risk parameters
-python main.py --recon -u example.com | grep -E "(id|search|url|fetch|proxy|file)"
+# From file
+python main.py --scan cmdi -f targets.txt --listener http://127.0.0.1:5000 --threads 5
 ```
 
-### Manual Callback Server (Optional)
+### XXE Scanning
 
 ```bash
-# Start server manually (if not using automatic startup)
-python -m bssrf.oob.callback_server --host 0.0.0.0 --port 5000
+# Direct URL
+python main.py --scan xxe -u "https://target/api/parse?x=1" --threads 5
 
-# Or using Python
-python -c "from bssrf.oob.callback_server import start_server_background; \
-start_server_background(port=5000); import time; time.sleep(999)"
-
-# Check callbacks via API
-curl http://localhost:5000/api/callbacks
-curl http://localhost:5000/api/check/{UUID}
+# Raw request with OOB
+python main.py --raw demo_raw_request.txt --scan xxe --listener http://127.0.0.1:5000
 ```
 
 ---
@@ -882,9 +826,9 @@ else:
 **How it works:**
 - `IF(1=2, SLEEP(5), 0)` = if FALSE then sleep 5 else do nothing
 - **Should NOT delay** if condition evaluation works
-- If delay **still happens** → database/server ignores the IF = slow server
+- If delay **still happens** → server is slow (false positive)
 - Threshold: delta ≥ 3.0s = false positive
-- This alone **eliminates 60%+ of false positives** from time-based detection
+- Eliminates **60%+ of false positives** from time-based detection
 
 ### 3. Baseline Jitter Analysis
 
@@ -896,7 +840,6 @@ baseline_mean, baseline_jitter = detector._measure_baseline_jitter(url)
 
 if baseline_jitter > 0.5:  # High variance
     print("⚠️ Server has unstable timing - confidence downgraded")
-    # Confidence HIGH → MEDIUM due to noise
 else:
     print("✅ Stable baseline - reliable timing measurements")
 ```
@@ -905,7 +848,7 @@ else:
 - Some servers naturally vary response times ±1-2 seconds
 - Testing SLEEP(5) on a variable server gives unreliable deltas
 - By sampling baseline 3x, we measure std_dev (standard deviation)
-- If jitter > threshold → can't trust time-based detection → downgrade confidence
+- If jitter > threshold → downgrade confidence
 
 ### 4. ML + Rule Hybrid Scoring
 
@@ -920,116 +863,13 @@ LOW (1)   | TRUE         | MEDIUM ⚠️
 LOW (1)   | FALSE        | LOW ❌
 ```
 
-Example:
-- IsolationForest returns ML score (anomaly = -1, normal = 1)
-- If **ML detects anomaly + linear delays match** → HIGH confidence
-- If **ML uncertain but delays linear** → MEDIUM (safer)
-- Two-factor authentication for SQLi detection
-
-### 5. Advanced Bypass Payloads
-
-```python
-from bsqli.modules.blind_sqli.payloads import (
-    json_sqli_payloads,
-    unicode_comment_sqli,
-    csp_bypass_payloads,
-    angular_react_context_payloads
-)
-
-# JSON-based SQLi (NoSQL injection)
-for payload in json_sqli_payloads():
-    test_injection(payload)
-
-# CSP bypass XSS
-for payload in csp_bypass_payloads(listener_url, uuid):
-    inject_xss(payload)
-```
-
-### 4. Per-Endpoint Models
+### 5. Per-Endpoint Models
 
 ```python
 from bsqli.ml.anomaly_stub import load_model
 
 # Load model for specific endpoint class
 model = load_model("auth")  # For /login, /signin, /auth endpoints
-```
-
----
-
-## Usage Examples
-
-### Example 1: Full SQLi Scan with ML
-
-```bash
-# Step 1: Recon + scan
-python main.py --recon -u testphp.vulnweb.com --scan sqli --threads 5
-
-# Step 2: Check findings
-cat bsqli/output/findings.txt
-
-# Step 3: Train ML model (after 30+ scans)
-python -c "from bsqli.ml.anomaly_stub import train_model; train_model()"
-
-# Step 4: Rescan with ML scoring
-python main.py --recon -u testphp.vulnweb.com --scan sqli
-```
-
-### Example 2: Blind XSS with Ngrok
-
-```bash
-# Terminal 1: Start ngrok
-ngrok http 5000
-
-# Terminal 2: Scan with ngrok URL
-python main.py --scan bxss \
-  -f targets.txt \
-  --listener https://abc123.ngrok.io \
-  --wait 120 \
-  --threads 2
-
-# Check callbacks
-sqlite3 bxss/output/callbacks.db "SELECT COUNT(*) FROM callbacks;"
-```
-
-### Example 3: Raw Request Mode
-
-```bash
-# Create raw request file (demo_raw_request.txt)
-cat > my_request.txt << 'EOF'
-POST /login HTTP/1.1
-Host: vulnerable.com
-Content-Type: application/x-www-form-urlencoded
-
-username=admin&password=test123
-EOF
-
-# Scan
-python main.py --raw my_request.txt
-```
-
-### Example 4: Advanced Time-Based Detection
-
-```python
-from bsqli.core.http_client import HttpClient
-from bsqli.modules.blind_sqli.advanced_time_detector import AdvancedTimeBasedDetector
-
-client = HttpClient(timeout=15)
-detector = AdvancedTimeBasedDetector(client)
-
-url = "http://vulnerable.com/search?q=test"
-result = detector.multi_probe_confirmation(url, "q", db="mysql")
-
-if result["confirmed"]:
-    print(f"[VULNERABLE] Confidence: {result['confidence']}")
-    print(f"  Linear fit: {result['evidence']['linear_fit']:.2f}")
-    print(f"  Baseline: {result['evidence']['baseline']:.2f}s")
-    print(f"  Jitter: {result['evidence']['jitter']:.2f}s")
-    
-    # Control payload check
-    if detector.control_payload_check(url, "q", db="mysql"):
-        print("[CONFIRMED] Not a slow server")
-    else:
-        print("[FALSE POSITIVE] Slow server detected")
 ```
 
 ---
@@ -1156,35 +996,6 @@ grep -c "VULNERABLE" bsqli/output/findings.txt
 
 ---
 
-## Appendix: File Reference
-
-### Core Files
-- `main.py` - CLI entry point with console summaries
-- `requirements.txt` - Python dependencies
-
-### BSQLI Module
-- `bsqli/core/http_client.py` - Rate limiting + header rotation
-- `bsqli/modules/blind_sqli/detector.py` - Boolean + time-based detection
-- `bsqli/modules/blind_sqli/advanced_time_detector.py` - Multi-probe + control payload
-- `bsqli/modules/blind_sqli/advanced_bypasses.py` - JSON/Unicode/subquery payloads
-- `bsqli/ml/anomaly_stub.py` - IsolationForest with delta_ratio
-
-### BXSS Module
-- `bxss/oob/callback_server.py` - SQLite + async processing
-- `bxss/oob/correlation.py` - UUID matching with expiration
-- `bxss/modules/blind_xss/detector.py` - Black-box injection
-- `bxss/ml/features.py` - time_bucket, ua_fingerprint, callback_repeat_count
-
-### Recon Module
-- `recon/param_scorer.py` - Parameter risk scoring
-- `recon/gf_filter.py` - Smart deduplication (path+params)
-
-### Documentation
-- This file (README.md) - Complete consolidated documentation
-
----
-
 **Project Status:** Production-Ready ✅  
-**Exam Grade Target:** First Class Honours  
-**Last Updated:** January 5, 2026
+**Last Updated:** January 22, 2026
 

@@ -107,3 +107,37 @@ class HttpClient:
         except requests.RequestException as e:
             logger.debug("HTTP GET error: %s", e)
             raise
+
+    def post(self, url, data=None, json=None, headers=None, cookies=None, files=None):
+        try:
+            host = urlparse(url).netloc
+
+            if self.rate_limiter.is_blocked(host):
+                logger.error(f"Host {host} appears blocked (too many 429/403) - skipping")
+                raise requests.RequestException(f"Host {host} blocked")
+
+            self.rate_limiter.wait_for_host(host)
+
+            if self.rotate_headers:
+                request_headers = get_random_headers()
+                if headers:
+                    request_headers.update(headers)
+            else:
+                request_headers = headers
+
+            resp = self.session.post(
+                url,
+                data=data,
+                json=json,
+                headers=request_headers,
+                cookies=cookies,
+                files=files,
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+
+            self.rate_limiter.record_response(host, resp.status_code)
+            return resp
+        except requests.RequestException as e:
+            logger.debug("HTTP POST error: %s", e)
+            raise

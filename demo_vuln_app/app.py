@@ -120,10 +120,19 @@ def index():
           <li><a href="/dns?domain=example.com">/dns?domain=example.com</a> — Blind CMDi via nslookup (time-based)</li>
           <li><a href="/process?cmd=ls">/process?cmd=ls</a> — Blind CMDi via OS command (time-based)</li>
         </ul>
+        <h3>XML External Entity (Blind XXE)</h3>
+        <ul>
+          <li><a href="/api/parse">/api/parse</a> (POST with XML body) — XXE via XML parsing (time-based, OAST-ready)</li>
+          <li><a href="/soap">/soap</a> (POST with SOAP) — XXE via SOAP endpoint (XML-based)</li>
+          <li><a href="/upload">/upload</a> (POST file upload) — XXE via SVG/XML file upload</li>
+        </ul>
         <p>
           Time-based simulation: if payloads contain patterns like
           <code>WAITFOR DELAY '00:00:5'</code>, <code>SLEEP(5)</code>, or <code>sleep 5</code>, 
           the server will sleep accordingly.
+        </p>
+        <p>
+          XXE simulation: if payloads contain DOCTYPE/ENTITY declarations, the server simulates XML parsing.
         </p>
         """
     )
@@ -483,6 +492,209 @@ def process():
         "output_lines": 5,
         "message": "Command executed (vulnerable to blind CMDi)"
     })
+
+
+# ============================================
+# Blind XXE Vulnerable Endpoints (for BXE demo)
+# ============================================
+
+@app.route("/api/parse", methods=["POST"])
+def parse_xml():
+    """
+    Blind XXE vulnerability: parses XML request body without XXE protection.
+    Vulnerable parameter: XML body content
+    
+    Demonstrates time-based XXE detection via:
+    - file:///dev/random (blocks parser)
+    - Recursive entity expansion (CPU-bound delay)
+    - Delayed network endpoints
+    
+    Also demonstrates parser behavior changes (status code, size).
+    """
+    xml_data = request.data.decode('utf-8', errors='ignore') if request.data else ""
+    
+    print(f"[XXE] parse_xml endpoint received: {len(xml_data)} bytes")
+    
+    # DEMO-ONLY: simulate XXE delays
+    # Check for XXE payload indicators
+    try:
+        # Detect /dev/random reference (should block)
+        if "/dev/random" in xml_data:
+            print("[XXE] parse_xml: detected /dev/random, simulating 3s block")
+            time.sleep(3)
+        
+        # Detect recursive entity expansion (Billion Laughs)
+        if "&lol" in xml_data.lower() and "entity" in xml_data.lower():
+            # Count entity references
+            entity_count = xml_data.count("&lol")
+            # Approximate delay based on nesting
+            if entity_count > 5:
+                print(f"[XXE] parse_xml: detected recursive entities ({entity_count}), simulating 2s CPU delay")
+                time.sleep(2)
+        
+        # Detect external entity with delay endpoint
+        if "SYSTEM" in xml_data and "http" in xml_data:
+            print("[XXE] parse_xml: detected external entity reference")
+            # Simulate parser attempting to fetch remote resource
+            time.sleep(0.5)
+        
+        # Check for control payloads (should not delay)
+        is_control = (
+            ("<?xml" in xml_data and "DOCTYPE" not in xml_data) or
+            ("<root>" in xml_data and "ENTITY" not in xml_data)
+        )
+        
+        if is_control:
+            print("[XXE] parse_xml: control payload detected (should not delay)")
+    
+    except Exception as e:
+        print(f"[XXE] parse_xml: error parsing delays: {e}")
+    
+    # Simulate XML parsing
+    try:
+        # In real scenario, this would parse the XML
+        # For demo, just check for well-formedness
+        if "<?xml" not in xml_data and "<" in xml_data:
+            # Bare XML tag, probably OK
+            pass
+        
+        return jsonify({
+            "status": "parsed",
+            "size": len(xml_data),
+            "message": "XML parsed successfully (vulnerable to blind XXE)",
+            "timestamp": time.time()
+        }), 200
+    
+    except Exception as e:
+        print(f"[XXE] parse_xml: parsing error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "message": "XML parsing failed"
+        }), 400
+
+
+@app.route("/soap", methods=["POST"])
+def soap_endpoint():
+    """
+    Blind XXE vulnerability: SOAP web service endpoint.
+    Vulnerable parameter: SOAP envelope (XML body)
+    
+    SOAP is XML-based and often processed without XXE protection.
+    """
+    soap_data = request.data.decode('utf-8', errors='ignore') if request.data else ""
+    
+    print(f"[XXE] soap endpoint received: {len(soap_data)} bytes")
+    
+    # DEMO-ONLY: simulate XXE delays in SOAP parsing
+    try:
+        # Check for SOAP envelope with XXE
+        if "soap:Envelope" in soap_data and "DOCTYPE" in soap_data:
+            print("[XXE] soap: SOAP with DOCTYPE detected")
+            
+            # Detect XXE payload
+            if "/dev/random" in soap_data:
+                print("[XXE] soap: /dev/random detected, sleeping 3s")
+                time.sleep(3)
+            
+            if "&lol" in soap_data.lower():
+                print("[XXE] soap: recursive entity detected, sleeping 2s")
+                time.sleep(2)
+    
+    except Exception as e:
+        print(f"[XXE] soap: error: {e}")
+    
+    # Return SOAP-like response
+    try:
+        if "soap:Envelope" in soap_data:
+            return jsonify({
+                "status": "success",
+                "message": "SOAP request processed (vulnerable to blind XXE)",
+                "size": len(soap_data)
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Invalid SOAP envelope"
+            }), 400
+    
+    except Exception as e:
+        print(f"[XXE] soap: response error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 400
+
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    """
+    Blind XXE vulnerability: file upload endpoint accepting XML/SVG files.
+    Vulnerable parameter: file content
+    
+    Files are processed (parsed) without XXE protection.
+    Common file types:
+    - SVG (XML-based images)
+    - XML documents
+    - Office documents (.docx, .xlsx are ZIP+XML)
+    """
+    
+    if 'file' not in request.files:
+        return jsonify({
+            "error": "No file provided",
+            "example": "POST multipart file with .svg or .xml extension"
+        }), 400
+    
+    file = request.files['file']
+    filename = file.filename or "upload.xml"
+    
+    try:
+        file_content = file.read().decode('utf-8', errors='ignore')
+        print(f"[XXE] upload endpoint: {filename} ({len(file_content)} bytes)")
+    except Exception as e:
+        print(f"[XXE] upload endpoint: error reading file: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 400
+    
+    # DEMO-ONLY: simulate XXE delays on file upload
+    try:
+        # SVG or XML upload
+        if filename.endswith(('.svg', '.xml', '.docx', '.xlsx')):
+            
+            # Detect XXE in uploaded file
+            if "/dev/random" in file_content:
+                print("[XXE] upload: /dev/random in SVG/XML, sleeping 3s")
+                time.sleep(3)
+            
+            if "&lol" in file_content.lower() and "DOCTYPE" in file_content:
+                print("[XXE] upload: recursive entity in upload, sleeping 2s")
+                time.sleep(2)
+            
+            if "DOCTYPE" in file_content and "ENTITY" in file_content:
+                print("[XXE] upload: XXE payload detected")
+                if "SYSTEM" in file_content:
+                    time.sleep(0.5)
+    
+    except Exception as e:
+        print(f"[XXE] upload: error: {e}")
+    
+    # Simulate file processing
+    try:
+        return jsonify({
+            "status": "success",
+            "filename": filename,
+            "size": len(file_content),
+            "message": "File uploaded and processed (vulnerable to blind XXE)"
+        }), 200
+    
+    except Exception as e:
+        print(f"[XXE] upload: processing error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 400
 
 
 def run(host: str = "127.0.0.1", port: int = 8000):

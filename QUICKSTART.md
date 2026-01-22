@@ -40,107 +40,89 @@ python main.py -f targets.txt --scan sqli --threads 10
 **targets.txt format:**
 ```
 http://example.com/search?q=test
-http://vulnerable.com/login?user=admin
-http://target.com/api/users?id=1
-```
+# Quickstart
 
-**Tips:**
-- `--threads 10` = faster but more aggressive (may trigger WAF)
-- `--threads 3` = slower but stealthy (recommended)
-
-**Output:** `bsqli/output/findings.txt`
+Fast commands for operators. See README.md for full context.
 
 ---
 
-### 3. Blind XSS - Batch with ngrok
-
-**Tests for Blind XSS with out-of-band callbacks**
+## Setup
 
 ```bash
-# Terminal 1: Start ngrok (if not already running)
-ngrok http 5000
-
-# Terminal 2: Run scan with ngrok URL
-python main.py -f targets.txt --scan bxss --listener https://abc123.ngrok.io --wait 120 --threads 2
-```
-
-**Breakdown:**
-- `--listener https://abc123.ngrok.io` - Your callback server URL (from ngrok)
-- `--wait 120` - Wait 120 seconds for callbacks (gives time for payloads to execute)
-- `--threads 2` - Keep low for BXSS (callbacks are slow)
-
-**What it does:**
-1. Injects UUID-tagged XSS payloads into parameters
-2. Payloads trigger callbacks to your listener
-3. Correlates callbacks with injections (matches UUID)
-4. Saves findings to `bxss/output/findings_xss.txt`
-
-**Output:** `bxss/output/callbacks.db` (SQLite with callback details)
-
----
-
-### 4. Raw HTTP Request (sqlmap -r style)
-
-**Scan a specific HTTP request**
-
-```bash
-python main.py --raw request.txt
-```
-
-**request.txt format:**
-```
-POST /api/search HTTP/1.1
-Host: vulnerable.com
-Content-Type: application/json
-
-{"query":"test","page":1}
-```
-
-**Note:** Only supports SQLi scanning (not BXSS)
-
----
-
-## Understanding the Output
-
-### SQLi Findings
-
-`bsqli/output/findings.txt`:
-```
-[+] BOOLEAN on id (http://example.com/search?id=1)
-    Confidence: HIGH
-    Evidence count: 2
-      #1: len_true=5234, len_false=4891, sim=0.92
-      #2: len_true=5234, len_false=4892, sim=0.91
-
-[+] TIME on param (http://example.com/page?param=value)
-    Confidence: HIGH
-    Evidence count: 3
-      #1: baseline=0.5s, injected=5.6s
-      #2: baseline=0.4s, injected=7.5s
-      #3: baseline=0.5s, injected=10.1s
-```
-
-**Confidence Levels:**
-- `HIGH` - Multiple probes confirm vulnerability
-- `MEDIUM` - Detection meets minimum threshold
-- `LOW` - Possible false positive
-
-### XSS Findings
-
-`bxss/output/findings_xss.txt`:
-```
-[+] XSS on search (http://example.com/search?q=<payload>)
-    Confidence: HIGH
-    Callback received after 2.3 seconds
-    User-Agent: Mozilla/5.0 (X11; Linux x86_64)
+pip install -r requirements.txt
+python main.py --help
 ```
 
 ---
 
-## Troubleshooting
+## Pick a Module
 
-### "No parameterized URLs found"
+| Use case | Flag |
+|----------|------|
+| Blind SQLi | `--scan sqli` |
+| Blind XSS (OOB) | `--scan bxss` + `--listener` + `--wait` |
+| Blind SSRF (OOB) | `--scan ssrf` + `--listener` + `--wait` |
+| Blind CMDi | `--scan cmdi` (+ `--listener` when OOB) |
+| Blind XXE | `--scan xxe` (+ `--listener` for OOB) |
 
+If the target cannot reach you, expose the listener (e.g., ngrok http 5000).
+
+---
+
+## Canonical Commands
+
+SQLi
+- `python main.py --scan sqli -u https://target.com/search?q=1 --threads 5`
+- `python main.py --scan sqli -f targets.txt --threads 10`
+- `python main.py --scan sqli --raw demo_raw_request.txt`
+
+BXSS
+- `python main.py --scan bxss -f targets.txt --listener http://127.0.0.1:5000 --wait 60 --threads 2`
+
+SSRF
+- `python main.py --scan ssrf -f targets.txt --listener http://127.0.0.1:5000 --wait 30 --threads 5`
+
+CMDi
+- `python main.py --scan cmdi -u https://target/ping?host=1 --threads 5 --listener http://127.0.0.1:5000`
+
+XXE
+- `python main.py --scan xxe -u https://target/api/parse?x=1 --threads 5`
+- `python main.py --scan xxe --raw demo_raw_request.txt --listener http://127.0.0.1:5000`
+
+Recon (optional)
+- `python main.py --recon --recon-mode passive -u example.com --scan sqli`
+
+---
+
+## Flags You’ll Use Most
+
+- `--scan {sqli,bxss,ssrf,cmdi,xxe}`
+- `-u URL` or `-f FILE`
+- `--listener URL` (bxss/ssrf/cmdi; optional for xxe OOB)
+- `--wait SECONDS` (bxss/ssrf/cmdi/xxe OOB)
+- `--threads N` (keep low for OOB)
+- `--raw file.txt` (sqlmap-style requests; sqli/xxe)
+- `--recon --recon-mode passive|active`
+
+---
+
+## Outputs
+
+- bsqli/output/findings.{json,txt}
+- bxss/output/findings_xss.{json,txt}, callbacks.json
+- bssrf/output/findings_ssrf.{json,txt}
+- bcmdi/output/findings_cmdi.{json,txt}
+- bxe/output/findings_xxe.{json,txt}
+
+---
+
+## Demo App (optional)
+
+- Start: `python demo_vuln_app/app.py --port 8000`
+- Targets: demo_vuln_app/urls_bxss.txt, urls_sqli.txt, urls_ssrf.txt
+- XXE harness: `python test_xxe_against_demo_app.py`
+
+Use the demo to verify setup before touching real targets.
 **Cause:** Recon didn't find any URLs with parameters
 
 **Solution:**
