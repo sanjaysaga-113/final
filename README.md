@@ -61,21 +61,25 @@ SQLi
 - POST/JSON via raw file: `python main.py --raw demo_raw_request.txt --scan sqli --threads 5`
 
 BXSS (requires listener)
-- URL: `python main.py -u "https://target/profile?name=x" --scan bxss --listener http://127.0.0.1:5000 --wait 60 --threads 2`
-- File: `python main.py -f targets.txt --scan bxss --listener http://127.0.0.1:5000 --wait 60 --threads 2`
+- URL: `python main.py -u "https://target/profile?name=x" --scan bxss --listener https://YOUR_NGROK_ID.ngrok.io --wait 60 --threads 2`
+- File: `python main.py -f targets.txt --scan bxss --listener https://YOUR_NGROK_ID.ngrok.io --wait 60 --threads 2`
+- Local demo (no ngrok): swap listener to `http://127.0.0.1:5000`
 
 SSRF (requires listener)
-- URL: `python main.py -u "https://target/fetch?url=https://example.com" --scan ssrf --listener http://127.0.0.1:5000 --wait 30 --threads 5`
-- File: `python main.py -f targets.txt --scan ssrf --listener http://127.0.0.1:5000 --wait 30 --threads 5`
+- URL: `python main.py -u "https://target/fetch?url=https://example.com" --scan ssrf --listener https://YOUR_NGROK_ID.ngrok.io --wait 30 --threads 5`
+- File: `python main.py -f targets.txt --scan ssrf --listener https://YOUR_NGROK_ID.ngrok.io --wait 30 --threads 5`
+- Local demo (no ngrok): swap listener to `http://127.0.0.1:5000`
 
-CMDi
-- URL: `python main.py -u "https://target/ping?host=1" --scan cmdi --listener http://127.0.0.1:5000 --threads 5`
-- File: `python main.py -f targets.txt --scan cmdi --listener http://127.0.0.1:5000 --threads 5`
+CMDi (OOB optional)
+- URL: `python main.py -u "https://target/ping?host=1" --scan cmdi --listener https://YOUR_NGROK_ID.ngrok.io --threads 5`
+- File: `python main.py -f targets.txt --scan cmdi --listener https://YOUR_NGROK_ID.ngrok.io --threads 5`
+- Local demo (no ngrok): swap listener to `http://127.0.0.1:5000`
 
 Blind XXE
 - URL: `python main.py -u "https://target/api/parse?x=1" --scan xxe --threads 5`
 - File: `python main.py -f targets.txt --scan xxe --threads 5`
-- POST/JSON via raw file: `python main.py --raw demo_raw_request.txt --scan xxe --listener http://127.0.0.1:5000`
+- POST/JSON via raw file (with OOB): `python main.py --raw demo_raw_request.txt --scan xxe --listener https://YOUR_NGROK_ID.ngrok.io`
+- Local demo (no ngrok): swap listener to `http://127.0.0.1:5000`
 
 How `--raw request.txt` is used (POST/JSON/XML)
 - File format: full HTTP request (method, path, headers, body) like sqlmap `-r`.
@@ -88,6 +92,12 @@ Recon (optional)
 
 Demo app
 - Start: `python demo_vuln_app/app.py --port 8000`
+- Module targets (all local, no ngrok):
+  - SQLi: `http://127.0.0.1:8000/search?name=test` (or file demo_vuln_app/urls_sqli.txt)
+  - BXSS: `http://127.0.0.1:8000/comment?text=PAYLOAD` (or file demo_vuln_app/urls_bxss.txt)
+  - SSRF: `http://127.0.0.1:8000/fetch_image?url=PAYLOAD`, `/webhook?callback=PAYLOAD`, `/fetch_file?file=PAYLOAD` (or file demo_vuln_app/urls_ssrf.txt)
+  - CMDi: `http://127.0.0.1:8000/ping?host=1`, `/dns?domain=example.com`, `/process?cmd=ls`
+  - XXE: `http://127.0.0.1:8000/api/parse`, `/soap`, `/upload` (use POST XML/file)
 - Run XXE harness: `python test_xxe_against_demo_app.py`
 
 Tests
