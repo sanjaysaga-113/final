@@ -8,6 +8,8 @@ Production-grade blind vulnerability scanner with five modules, recon, ML-assist
 
 - [Project Overview](#project-overview)
 - [Quick Start](#quick-start)
+- [Install & Environment](#install--environment)
+- [Frontend Setup & Usage](#frontend-setup--usage)
 - [When to Use ngrok](#when-to-use-ngrok-and-when-you-dont)
 - [What's New](#whats-new-recent-updates)
 - [Architecture](#architecture)
