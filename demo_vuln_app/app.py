@@ -99,17 +99,31 @@ def index():
         """
         <h2>Vulnerable Demo App</h2>
         <p>For local demo only. Do NOT expose publicly.</p>
+        <h3>SQL Injection (Time-Based)</h3>
         <ul>
           <li><a href="/search?name=alice">/search?name=alice</a> — SQL query with unsafe string concatenation</li>
+        </ul>
+        <h3>Cross-Site Scripting (Blind XSS)</h3>
+        <ul>
           <li><a href="/comment?text=hello">/comment?text=hello</a> — Stores comments and reflects unsanitized</li>
           <li><a href="/comments">/comments</a> — List stored comments</li>
+        </ul>
+        <h3>Server-Side Request Forgery (SSRF)</h3>
+        <ul>
           <li><a href="/fetch_image?url=http://google.com">/fetch_image?url=...</a> — SSRF via image URL parameter</li>
           <li><a href="/webhook?callback=http://localhost:8080">/webhook?callback=...</a> — SSRF via webhook callback parameter</li>
           <li><a href="/fetch_file?file=http://localhost:8000">/fetch_file?file=...</a> — SSRF via file fetch parameter</li>
         </ul>
+        <h3>Command Injection (Blind CMDi)</h3>
+        <ul>
+          <li><a href="/ping?host=127.0.0.1">/ping?host=127.0.0.1</a> — Blind CMDi via ping (time-based)</li>
+          <li><a href="/dns?domain=example.com">/dns?domain=example.com</a> — Blind CMDi via nslookup (time-based)</li>
+          <li><a href="/process?cmd=ls">/process?cmd=ls</a> — Blind CMDi via OS command (time-based)</li>
+        </ul>
         <p>
-          Time-based simulation: if the <code>name</code> parameter contains patterns like
-          <code>WAITFOR DELAY '00:00:5'</code> or <code>SLEEP(5)</code>, the server will sleep accordingly.
+          Time-based simulation: if payloads contain patterns like
+          <code>WAITFOR DELAY '00:00:5'</code>, <code>SLEEP(5)</code>, or <code>sleep 5</code>, 
+          the server will sleep accordingly.
         </p>
         """
     )
@@ -320,6 +334,155 @@ def fetch_file():
             "file_url": file_url,
             "error": str(e)
         }), 400
+
+
+# ============================================
+# Blind CMDi Vulnerable Endpoints (for BCMDI demo)
+# ============================================
+
+@app.route("/ping")
+def ping():
+    """
+    Blind CMDi vulnerability: pings a host with user-supplied hostname.
+    Vulnerable parameter: 'host'
+    
+    Demonstrates time-based blind command injection detection.
+    Payloads like "127.0.0.1; sleep 5" will cause delays.
+    """
+    host = request.args.get("host", "127.0.0.1")
+    
+    # DEMO-ONLY: simulate time-based CMDi delays
+    # Parse for sleep/timeout commands injected via separator
+    try:
+        # Handle various injection payloads
+        # sleep 3, sleep 5, sleep 7 (Linux)
+        m = re.search(r"sleep\s+(\d+)", host, re.IGNORECASE)
+        if m:
+            delay = int(m.group(1))
+            print(f"[CMDi] ping endpoint: detected sleep command, sleeping {delay}s")
+            time.sleep(delay)
+        
+        # timeout /t N (Windows)
+        m = re.search(r"timeout\s+/t\s+(\d+)", host, re.IGNORECASE)
+        if m:
+            delay = int(m.group(1))
+            print(f"[CMDi] ping endpoint: detected timeout command, sleeping {delay}s")
+            time.sleep(delay)
+        
+        # ping -n N (Windows/Linux)
+        m = re.search(r"ping\s+-n\s+(\d+)", host, re.IGNORECASE)
+        if m:
+            count = int(m.group(1))
+            # Approximate delay: N-1 seconds (N ping packets)
+            delay = max(0, count - 1)
+            if delay > 0:
+                print(f"[CMDi] ping endpoint: detected ping -n, sleeping {delay}s")
+                time.sleep(delay)
+    except Exception as e:
+        print(f"[CMDi] ping endpoint: error parsing delay: {e}")
+    
+    # Simulate ping command (return success regardless)
+    print(f"[CMDi] ping endpoint: host={host}")
+    
+    return jsonify({
+        "status": "success",
+        "host": host,
+        "message": "Host pinged successfully (vulnerable to blind CMDi)"
+    })
+
+
+@app.route("/dns")
+def dns():
+    """
+    Blind CMDi vulnerability: performs DNS lookup on user-supplied domain.
+    Vulnerable parameter: 'domain'
+    
+    Demonstrates time-based blind command injection detection.
+    Payloads like "example.com; sleep 5" will cause delays.
+    """
+    domain = request.args.get("domain", "example.com")
+    
+    # DEMO-ONLY: simulate time-based CMDi delays
+    try:
+        # Parse for sleep/timeout commands
+        m = re.search(r"sleep\s+(\d+)", domain, re.IGNORECASE)
+        if m:
+            delay = int(m.group(1))
+            print(f"[CMDi] dns endpoint: detected sleep command, sleeping {delay}s")
+            time.sleep(delay)
+        
+        m = re.search(r"timeout\s+/t\s+(\d+)", domain, re.IGNORECASE)
+        if m:
+            delay = int(m.group(1))
+            print(f"[CMDi] dns endpoint: detected timeout command, sleeping {delay}s")
+            time.sleep(delay)
+        
+        m = re.search(r"ping\s+-n\s+(\d+)", domain, re.IGNORECASE)
+        if m:
+            count = int(m.group(1))
+            delay = max(0, count - 1)
+            if delay > 0:
+                print(f"[CMDi] dns endpoint: detected ping -n, sleeping {delay}s")
+                time.sleep(delay)
+    except Exception as e:
+        print(f"[CMDi] dns endpoint: error parsing delay: {e}")
+    
+    # Simulate DNS lookup (return fake results)
+    print(f"[CMDi] dns endpoint: domain={domain}")
+    
+    return jsonify({
+        "status": "success",
+        "domain": domain,
+        "ip_addresses": ["192.168.1.1"],
+        "message": "DNS lookup completed (vulnerable to blind CMDi)"
+    })
+
+
+@app.route("/process")
+def process():
+    """
+    Blind CMDi vulnerability: processes a command parameter.
+    Vulnerable parameter: 'cmd'
+    
+    Demonstrates time-based blind command injection detection.
+    Payloads like "ls; sleep 5" will cause delays.
+    """
+    cmd = request.args.get("cmd", "ls")
+    
+    # DEMO-ONLY: simulate time-based CMDi delays
+    try:
+        # Parse for sleep/timeout commands
+        m = re.search(r"sleep\s+(\d+)", cmd, re.IGNORECASE)
+        if m:
+            delay = int(m.group(1))
+            print(f"[CMDi] process endpoint: detected sleep command, sleeping {delay}s")
+            time.sleep(delay)
+        
+        m = re.search(r"timeout\s+/t\s+(\d+)", cmd, re.IGNORECASE)
+        if m:
+            delay = int(m.group(1))
+            print(f"[CMDi] process endpoint: detected timeout command, sleeping {delay}s")
+            time.sleep(delay)
+        
+        m = re.search(r"ping\s+-n\s+(\d+)", cmd, re.IGNORECASE)
+        if m:
+            count = int(m.group(1))
+            delay = max(0, count - 1)
+            if delay > 0:
+                print(f"[CMDi] process endpoint: detected ping -n, sleeping {delay}s")
+                time.sleep(delay)
+    except Exception as e:
+        print(f"[CMDi] process endpoint: error parsing delay: {e}")
+    
+    # Simulate command execution (return fake results)
+    print(f"[CMDi] process endpoint: cmd={cmd}")
+    
+    return jsonify({
+        "status": "success",
+        "command": cmd,
+        "output_lines": 5,
+        "message": "Command executed (vulnerable to blind CMDi)"
+    })
 
 
 def run(host: str = "127.0.0.1", port: int = 8000):
