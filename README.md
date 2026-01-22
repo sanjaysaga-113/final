@@ -47,7 +47,91 @@ pip install -r requirements.txt
 python main.py --help
 ```
 
-Dependencies: Python 3.8+, requests, Flask (demo app), scikit-learn (ML stubs). Keep recon/wordlists/burp_parameter_names.txt in place.
+Dependencies: Python 3.8+, requests, Flask, python-socketio, scikit-learn. Keep recon/wordlists/burp_parameter_names.txt in place.
+
+---
+
+## Frontend Setup & Usage
+
+### Running the Web Dashboard
+
+The Flask-based frontend provides a professional UI for all vulnerability scanning modules with real-time output streaming.
+
+#### Prerequisites
+- Python 3.8+ with `pip`
+- All dependencies installed (see requirements.txt)
+
+#### Quick Start
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Start the frontend server:**
+   ```bash
+   python frontend/app.py
+   ```
+   
+   Expected output:
+   ```
+   [2026-01-22 21:00:54] INFO: Starting Black-Box Vulnerability Scanner Frontend
+   [2026-01-22 21:00:54] INFO: Upload folder: .../frontend/uploads
+   [2026-01-22 21:00:54] INFO: Upload folder: .../frontend/logs
+    * Running on http://0.0.0.0:5000
+   ```
+
+3. **Open in browser:**
+   - Navigate to `http://localhost:5000`
+   - You should see the Black-Box Web Vulnerability Scanner dashboard
+
+#### Frontend Features
+
+- **Real-Time Output:** WebSocket-based log streaming with timestamped entries and color-coded levels
+- **Target Input:** Single URL or batch file upload (.txt, one URL per line)
+- **Reconnaissance Control:** Enable/disable recon with passive-only or passive+active modes
+- **Module Selection:** Choose any combination of 5 scanning modules:
+  - Blind SQLi (bsqli)
+  - Blind XSS (bxss) — requires callback URL (ngrok/Burp Collaborator)
+  - Blind SSRF (bssrf) — requires callback URL
+  - Blind Command Injection (bcmdi)
+  - Blind XXE (bxxe)
+- **Scan Results Table:** Displays findings with module, URL, parameter, confidence level, and evidence
+- **Report Download:** Export results as JSON or TXT format
+
+#### Using Callback URLs (for BXSS/SSRF/CMDi)
+
+If scanning BXSS, SSRF, or CMDi modules, you need an Out-of-Band (OOB) callback server:
+
+**Option 1: Use ngrok (Free, Easy)**
+```bash
+# In another terminal, start ngrok
+ngrok http 5000
+
+# Copy the ngrok URL (e.g., https://abc123.ngrok.io)
+# Paste into "XSS Callback URL" field in the dashboard
+```
+
+**Option 2: Use Burp Collaborator**
+- Get a Burp Collaborator URL from Burp Suite
+- Paste into the callback URL field
+
+#### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Port 5000 in use | Change port: `python frontend/app.py --port 5001` |
+| WebSocket connection fails | Ensure firewall allows localhost:5000 |
+| Scan hangs | Check target URL is reachable; increase timeout in scanner_bridge.py |
+| No callback received | Verify callback URL is correct and server is running |
+| Module not found | Ensure all backend modules (bxss/, bsqli/, etc.) are in project root |
+
+#### Development Notes
+
+- Frontend uses vanilla JavaScript (no external frameworks)
+- All styling is in `frontend/static/css/style.css`
+- WebSocket communication via python-socketio
+- Scan execution isolated in background threads (non-blocking HTTP)
 
 ---
 

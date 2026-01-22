@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black-Box Web Vulnerability Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">
+                    <span class="icon">⚡</span>
+                    Black-Box Web Vulnerability Scanner
+                </h1>
+                <div class="subtitle">Security Testing Dashboard</div>
+            </div>
+            <div class="status-indicator" id="scanStatus">
+                <span class="status-dot idle"></span>
+                <span class="status-text">Idle</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Configuration Panel -->
+            <section class="panel config-panel">
+                <h2 class="panel-title">
+                    <span class="icon">⚙️</span>
+                    Scan Configuration
+                </h2>
+                
+                <form id="scanForm">
+                    <!-- Target Input Section -->
+                    <div class="form-section">
+                        <h3 class="section-title">Target Input</h3>
+                        
+                        <div class="input-group">
+                            <label class="radio-label">
+                                <input type="radio" name="inputType" value="url" checked>
+                                <span>Single URL</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="inputType" value="file">
+                                <span>File Upload (multiple targets)</span>
+                            </label>
+                        </div>
+
+                        <div id="urlInputGroup" class="input-container">
+                            <label for="targetUrl">Target URL</label>
+                            <input 
+                                type="text" 
+                                id="targetUrl" 
+                                name="targetUrl"
+                                class="text-input"
+                                placeholder="https://example.com/page?param=value"
+                            >
+                            <small class="input-help">Enter a complete URL with parameters</small>
+                        </div>
+
+                        <div id="fileInputGroup" class="input-container" style="display: none;">
+                            <label for="targetFile">Upload Target File</label>
+                            <div class="file-upload">
+                                <input 
+                                    type="file" 
+                                    id="targetFile" 
+                                    name="targetFile"
+                                    accept=".txt"
+                                    class="file-input"
+                                >
+                                <label for="targetFile" class="file-label">
+                                    <span class="file-icon">📁</span>
+                                    <span class="file-text">Choose .txt file</span>
+                                </label>
+                                <span class="file-name" id="fileName"></span>
+                            </div>
+                            <small class="input-help">Upload a .txt file with one URL per line</small>
+                        </div>
+                    </div>
+
+                    <!-- Recon Control Section -->
+                    <div class="form-section">
+                        <h3 class="section-title">Reconnaissance</h3>
+                        
+                        <div class="checkbox-container">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enableRecon" name="enableRecon">
+                                <span class="checkbox-custom"></span>
+                                <span>Enable Reconnaissance</span>
+                            </label>
+                        </div>
+
+                        <div id="reconOptions" class="recon-options" style="display: none;">
+                            <label class="radio-label">
+                                <input type="radio" name="reconMode" value="passive" checked>
+                                <span>
+                                    <span>Passive Recon Only</span>
+                                    <small class="radio-help">Non-intrusive URL discovery (archived, search)</small>
+                                </span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="reconMode" value="active">
+                                <span>
+                                    <span>Passive + Active Recon</span>
+                                    <small class="radio-help">Includes crawling and parameter discovery</small>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Module Selection Section -->
+                    <div class="form-section">
+                        <h3 class="section-title">Scan Modules</h3>
+                        
+                        <div class="modules-grid">
+                            <label class="module-card">
+                                <input type="checkbox" name="modules" value="bxss">
+                                <div class="module-content">
+                                    <div class="module-header">
+                                        <span class="module-icon">🔴</span>
+                                        <span class="module-name">Blind XSS</span>
+                                    </div>
+                                    <p class="module-desc">Cross-Site Scripting with OOB callbacks</p>
+                                </div>
+                            </label>
+
+                            <label class="module-card">
+                                <input type="checkbox" name="modules" value="bsqli">
+                                <div class="module-content">
+                                    <div class="module-header">
+                                        <span class="module-icon">🔵</span>
+                                        <span class="module-name">Blind SQLi</span>
+                                    </div>
+                                    <p class="module-desc">SQL Injection via time-based detection</p>
+                                </div>
+                            </label>
+
+                            <label class="module-card">
+                                <input type="checkbox" name="modules" value="bssrf">
+                                <div class="module-content">
+                                    <div class="module-header">
+                                        <span class="module-icon">🟢</span>
+                                        <span class="module-name">Blind SSRF</span>
+                                    </div>
+                                    <p class="module-desc">Server-Side Request Forgery detection</p>
+                                </div>
+                            </label>
+
+                            <label class="module-card">
+                                <input type="checkbox" name="modules" value="bcmdi">
+                                <div class="module-content">
+                                    <div class="module-header">
+                                        <span class="module-icon">🟡</span>
+                                        <span class="module-name">Command Injection</span>
+                                    </div>
+                                    <p class="module-desc">OS command injection testing</p>
+                                </div>
+                            </label>
+
+                            <label class="module-card">
+                                <input type="checkbox" name="modules" value="bxxe">
+                                <div class="module-content">
+                                    <div class="module-header">
+                                        <span class="module-icon">🟣</span>
+                                        <span class="module-name">XXE</span>
+                                    </div>
+                                    <p class="module-desc">XML External Entity exploitation</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div id="moduleError" class="error-message" style="display: none;">
+                            Please select at least one scan module
+                        </div>
+                    </div>
+
+                    <!-- Callback Server (XSS Module) -->
+                    <div id="callbackSection" class="form-section" style="display: none;">
+                        <h3 class="section-title">Callback Server Configuration</h3>
+                        
+                        <div class="input-container">
+                            <label for="callbackUrl">Callback Server URL</label>
+                            <input 
+                                type="text" 
+                                id="callbackUrl" 
+                                name="callbackUrl"
+                                class="text-input"
+                                placeholder="https://your-ngrok-url.ngrok.io or http://your-server.com"
+                            >
+                            <small class="input-help">Required for Blind XSS detection. Use ngrok, Burp Collaborator, or your own OOB server</small>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="button-group">
+                        <button type="submit" id="startScanBtn" class="btn btn-primary">
+                            <span class="btn-icon">▶</span>
+                            Start Scan
+                        </button>
+                        <button type="button" id="stopScanBtn" class="btn btn-danger" disabled>
+                            <span class="btn-icon">⏹</span>
+                            Stop Scan
+                        </button>
+                        <button type="reset" id="resetBtn" class="btn btn-secondary">
+                            <span class="btn-icon">↺</span>
+                            Reset
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Terminal Output Panel -->
+            <section class="panel terminal-panel">
+                <div class="terminal-header">
+                    <h2 class="panel-title">
+                        <span class="icon">💻</span>
+                        Real-Time Output
+                    </h2>
+                    <div class="terminal-controls">
+                        <button id="clearLogsBtn" class="terminal-btn" title="Clear logs">
+                            <span>🗑️</span>
+                        </button>
+                        <button id="scrollLockBtn" class="terminal-btn" title="Toggle auto-scroll">
+                            <span>🔒</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="terminal" class="terminal">
+                    <div class="terminal-line welcome">
+                        <span class="timestamp">[00:00:00]</span>
+                        <span class="log-info">Vulnerability Scanner v1.0</span>
+                    </div>
+                    <div class="terminal-line welcome">
+                        <span class="timestamp">[00:00:00]</span>
+                        <span class="log-info">Waiting for scan initialization...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Panel -->
+            <section class="panel results-panel">
+                <div class="results-header">
+                    <h2 class="panel-title">
+                        <span class="icon">📊</span>
+                        Scan Results
+                    </h2>
+                    <div class="results-controls" id="resultsControls" style="display: none;">
+                        <button id="downloadJsonBtn" class="btn btn-small">
+                            <span>📥</span> JSON
+                        </button>
+                        <button id="downloadTxtBtn" class="btn btn-small">
+                            <span>📥</span> TXT
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultsContainer" class="results-container">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <p>No scan results yet</p>
+                        <small>Results will appear here after scan completion</small>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Web Vulnerability Scanner © 2026 | Final Year Project</p>
+        </footer>
+    </div>
+
+    <!-- WebSocket & Application Logic -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
