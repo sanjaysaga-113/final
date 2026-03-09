@@ -1,0 +1,359 @@
+{
+  "dataset": "ShadowProbeEvalBench-2026",
+  "generated_at": "2026-03-08T13:08:45.805957",
+  "inventory": {
+    "sqli": {
+      "targets": 2,
+      "vulnerable_targets": 1,
+      "non_vulnerable_targets": 1,
+      "unique_parameters": 1,
+      "unique_paths": 2
+    },
+    "bxss": {
+      "targets": 2,
+      "vulnerable_targets": 1,
+      "non_vulnerable_targets": 1,
+      "unique_parameters": 1,
+      "unique_paths": 2
+    },
+    "ssrf": {
+      "targets": 6,
+      "vulnerable_targets": 3,
+      "non_vulnerable_targets": 3,
+      "unique_parameters": 3,
+      "unique_paths": 6
+    },
+    "cmdi": {
+      "targets": 6,
+      "vulnerable_targets": 3,
+      "non_vulnerable_targets": 3,
+      "unique_parameters": 3,
+      "unique_paths": 6
+    },
+    "xxe": {
+      "targets": 6,
+      "vulnerable_targets": 3,
+      "non_vulnerable_targets": 3,
+      "unique_parameters": 3,
+      "unique_paths": 6
+    }
+  },
+  "metrics": [
+    {
+      "module": "sqli",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "specificity": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "accuracy": 1.0
+    },
+    {
+      "module": "bxss",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "specificity": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "accuracy": 1.0
+    },
+    {
+      "module": "ssrf",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "specificity": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "accuracy": 1.0
+    },
+    {
+      "module": "cmdi",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "specificity": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "accuracy": 1.0
+    },
+    {
+      "module": "xxe",
+      "tp": 0,
+      "fp": 1,
+      "fn": 2,
+      "tn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "specificity": 0.5,
+      "fpr": 0.5,
+      "fnr": 1.0,
+      "accuracy": 0.25
+    }
+  ],
+  "warnings": {},
+  "details": {
+    "sqli": {
+      "findings_path": "bsqli/output/findings.json",
+      "findings_count": 1,
+      "predicted_keys": [
+        [
+          "sqli",
+          "/search",
+          "name"
+        ]
+      ],
+      "truth_positive_keys": [
+        [
+          "sqli",
+          "/search",
+          "name"
+        ]
+      ],
+      "truth_negative_keys": [
+        [
+          "sqli",
+          "/sqli/search_safe",
+          "name"
+        ]
+      ]
+    },
+    "bxss": {
+      "findings_path": "bxss/output/findings_xss.json",
+      "findings_count": 11,
+      "predicted_keys": [
+        [
+          "bxss",
+          "/comment",
+          "text"
+        ]
+      ],
+      "truth_positive_keys": [
+        [
+          "bxss",
+          "/comment",
+          "text"
+        ]
+      ],
+      "truth_negative_keys": [
+        [
+          "bxss",
+          "/xss/comment_safe",
+          "text"
+        ]
+      ]
+    },
+    "ssrf": {
+      "findings_path": "bssrf/output/findings_ssrf.json",
+      "findings_count": 36,
+      "predicted_keys": [
+        [
+          "ssrf",
+          "/fetch_file",
+          "file"
+        ],
+        [
+          "ssrf",
+          "/fetch_image",
+          "url"
+        ],
+        [
+          "ssrf",
+          "/webhook",
+          "callback"
+        ]
+      ],
+      "truth_positive_keys": [
+        [
+          "ssrf",
+          "/fetch_file",
+          "file"
+        ],
+        [
+          "ssrf",
+          "/fetch_image",
+          "url"
+        ],
+        [
+          "ssrf",
+          "/webhook",
+          "callback"
+        ]
+      ],
+      "truth_negative_keys": [
+        [
+          "ssrf",
+          "/ssrf/fetch_safe",
+          "url"
+        ],
+        [
+          "ssrf",
+          "/ssrf/file_safe",
+          "file"
+        ],
+        [
+          "ssrf",
+          "/ssrf/webhook_safe",
+          "callback"
+        ]
+      ]
+    },
+    "cmdi": {
+      "findings_path": "bcmdi/output/findings_cmdi.json",
+      "findings_count": 3,
+      "predicted_keys": [
+        [
+          "cmdi",
+          "/dns",
+          "domain"
+        ],
+        [
+          "cmdi",
+          "/ping",
+          "host"
+        ],
+        [
+          "cmdi",
+          "/process",
+          "cmd"
+        ]
+      ],
+      "truth_positive_keys": [
+        [
+          "cmdi",
+          "/dns",
+          "domain"
+        ],
+        [
+          "cmdi",
+          "/ping",
+          "host"
+        ],
+        [
+          "cmdi",
+          "/process",
+          "cmd"
+        ]
+      ],
+      "truth_negative_keys": [
+        [
+          "cmdi",
+          "/cmdi/dns_safe",
+          "domain"
+        ],
+        [
+          "cmdi",
+          "/cmdi/ping_safe",
+          "host"
+        ],
+        [
+          "cmdi",
+          "/cmdi/process_safe",
+          "cmd"
+        ]
+      ]
+    },
+    "xxe": {
+      "findings_path": "bxe/output/findings_xxe.json",
+      "findings_count": 2,
+      "predicted_keys": [
+        [
+          "xxe",
+          "/xxe/parse_safe",
+          "xml_body"
+        ],
+        [
+          "xxe",
+          "/xxe/soap_safe",
+          "xml_body"
+        ]
+      ],
+      "truth_positive_keys": [
+        [
+          "xxe",
+          "/api/parse",
+          "xml_body"
+        ],
+        [
+          "xxe",
+          "/soap",
+          "soap_body"
+        ]
+      ],
+      "truth_negative_keys": [
+        [
+          "xxe",
+          "/xxe/parse_safe",
+          "xml_body"
+        ],
+        [
+          "xxe",
+          "/xxe/soap_safe",
+          "soap_body"
+        ]
+      ]
+    }
+  },
+  "ssrf_confirmed_only": true,
+  "target_scope_enabled": true,
+  "target_scope_paths": {
+    "sqli": [
+      "/search",
+      "/sqli/search_safe"
+    ],
+    "bxss": [
+      "/comment",
+      "/xss/comment_safe"
+    ],
+    "ssrf": [
+      "/fetch_file",
+      "/fetch_image",
+      "/ssrf/fetch_safe",
+      "/ssrf/file_safe",
+      "/ssrf/webhook_safe",
+      "/webhook"
+    ],
+    "cmdi": [
+      "/cmdi/dns_safe",
+      "/cmdi/ping_safe",
+      "/cmdi/process_safe",
+      "/dns",
+      "/ping",
+      "/process"
+    ],
+    "xxe": [
+      "/api/parse",
+      "/soap",
+      "/xxe/parse_safe",
+      "/xxe/soap_safe"
+    ]
+  },
+  "metric_definitions": {
+    "precision": "TP/(TP+FP)",
+    "recall": "TP/(TP+FN)",
+    "f1": "2PR/(P+R)",
+    "specificity": "TN/(TN+FP)",
+    "fpr": "FP/(FP+TN)",
+    "fnr": "FN/(FN+TP)",
+    "accuracy": "(TP+TN)/(TP+TN+FP+FN)"
+  }
+}

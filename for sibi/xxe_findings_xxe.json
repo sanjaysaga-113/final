@@ -1,0 +1,112 @@
+[
+  {
+    "type": "blind_xxe",
+    "endpoint": "http://127.0.0.1:8000/soap",
+    "parameter": "soap_body",
+    "method": "POST",
+    "is_vulnerable": true,
+    "technique": "time_based",
+    "confidence": "medium",
+    "payload": "XXE injection in XML/SOAP/JSON",
+    "findings": [
+      {
+        "technique": "time_based",
+        "method": "soap_doctype_delay",
+        "response_time": 3.5,
+        "baseline_avg": 0.596,
+        "threshold": 2.096
+      }
+    ],
+    "ml_score": 0.0,
+    "ml_features": {
+      "url": "http://127.0.0.1:8000/soap",
+      "parameter": "soap_body",
+      "response_time": 0.3129564126332601,
+      "delta_from_baseline": 0.0,
+      "response_size": 0,
+      "status_code": 200,
+      "oast_triggered": 0.0,
+      "time_delta_ratio": 0.0,
+      "std_dev_ratio": 0.0,
+      "control_payload_passed": 1.0,
+      "technique_count": 0
+    },
+    "ml_confidence": "LOW",
+    "ml_decision": "normal",
+    "ml_model": "xxe_feature_rules"
+  },
+  {
+    "type": "blind_xxe",
+    "endpoint": "http://127.0.0.1:8000/api/parse",
+    "parameter": "xml_body",
+    "method": "POST",
+    "is_vulnerable": true,
+    "technique": "time_based",
+    "confidence": "high",
+    "payload": "XXE injection in XML/SOAP/JSON",
+    "findings": [
+      {
+        "technique": "time_based",
+        "method": "dev_random",
+        "response_time": 3.4472358226776123,
+        "baseline_avg": 0.3968018690745036,
+        "delta": 3.050433953603109,
+        "threshold": 2.1968018690745033,
+        "payload_type": "time_xxe"
+      },
+      {
+        "technique": "time_based",
+        "method": "dev_random",
+        "response_time": 3.2405853271484375,
+        "baseline_avg": 0.3968018690745036,
+        "delta": 2.843783458073934,
+        "threshold": 2.1968018690745033,
+        "payload_type": "time_xxe"
+      },
+      {
+        "technique": "time_based",
+        "method": "dev_random",
+        "response_time": 3.2677578926086426,
+        "baseline_avg": 0.3968018690745036,
+        "delta": 2.870956023534139,
+        "threshold": 2.1968018690745033,
+        "payload_type": "time_xxe"
+      },
+      {
+        "technique": "time_based",
+        "method": "entity_expansion",
+        "response_time": 2.2900044918060303,
+        "baseline_avg": 0.3968018690745036,
+        "delta": 1.8932026227315266,
+        "threshold": 1.8968018690745037,
+        "payload_type": "time_xxe"
+      },
+      {
+        "technique": "time_based",
+        "method": "entity_expansion",
+        "response_time": 2.4528095722198486,
+        "baseline_avg": 0.3968018690745036,
+        "delta": 2.056007703145345,
+        "threshold": 1.8968018690745037,
+        "payload_type": "time_xxe"
+      }
+    ],
+    "ml_score": 0.4,
+    "ml_features": {
+      "url": "http://127.0.0.1:8000/api/parse",
+      "parameter": "xml_body",
+      "response_time": 3.4472358226776123,
+      "delta_from_baseline": 3.050433953603109,
+      "response_size": 0,
+      "status_code": 200,
+      "oast_triggered": 0.0,
+      "time_delta_ratio": 7.687549357360408,
+      "std_dev_ratio": 9.100244512731319,
+      "control_payload_passed": 1.0,
+      "technique_count": 1
+    },
+    "ml_confidence": "LOW",
+    "ml_decision": "normal",
+    "ml_model": "xxe_feature_rules"
+  }
+]

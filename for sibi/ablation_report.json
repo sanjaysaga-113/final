@@ -1,0 +1,711 @@
+{
+  "dataset": "ShadowProbeEvalBench-2026",
+  "generated_at": "2026-03-08T13:08:45.805957",
+  "stages": [
+    "regression",
+    "control",
+    "delta_if",
+    "oob"
+  ],
+  "ml_threshold": 0.55,
+  "rows": [
+    {
+      "module": "sqli",
+      "stage": "regression",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "sqli",
+      "stage": "control",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "sqli",
+      "stage": "delta_if",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "sqli",
+      "stage": "oob",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "bxss",
+      "stage": "regression",
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "tn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "bxss",
+      "stage": "control",
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "tn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "bxss",
+      "stage": "delta_if",
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "tn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "bxss",
+      "stage": "oob",
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "tn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "ssrf",
+      "stage": "regression",
+      "tp": 3,
+      "fp": 3,
+      "fn": 0,
+      "tn": 0,
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.6667
+    },
+    {
+      "module": "ssrf",
+      "stage": "control",
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "ssrf",
+      "stage": "delta_if",
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "ssrf",
+      "stage": "oob",
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "cmdi",
+      "stage": "regression",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "cmdi",
+      "stage": "control",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "cmdi",
+      "stage": "delta_if",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "cmdi",
+      "stage": "oob",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "module": "xxe",
+      "stage": "regression",
+      "tp": 0,
+      "fp": 1,
+      "fn": 3,
+      "tn": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "xxe",
+      "stage": "control",
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "xxe",
+      "stage": "delta_if",
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "module": "xxe",
+      "stage": "oob",
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  ],
+  "details": {
+    "sqli": {
+      "findings_path": "bsqli/output/findings.json",
+      "findings_count": 1,
+      "positive_truth_count": 1,
+      "negative_truth_count": 1,
+      "stages": {
+        "regression": {
+          "predicted_count": 1,
+          "predicted_keys": [
+            [
+              "sqli",
+              "/search",
+              "name"
+            ]
+          ],
+          "metrics": {
+            "module": "sqli",
+            "stage": "regression",
+            "tp": 1,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "control": {
+          "predicted_count": 1,
+          "predicted_keys": [
+            [
+              "sqli",
+              "/search",
+              "name"
+            ]
+          ],
+          "metrics": {
+            "module": "sqli",
+            "stage": "control",
+            "tp": 1,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "delta_if": {
+          "predicted_count": 1,
+          "predicted_keys": [
+            [
+              "sqli",
+              "/search",
+              "name"
+            ]
+          ],
+          "metrics": {
+            "module": "sqli",
+            "stage": "delta_if",
+            "tp": 1,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "oob": {
+          "predicted_count": 1,
+          "predicted_keys": [
+            [
+              "sqli",
+              "/search",
+              "name"
+            ]
+          ],
+          "metrics": {
+            "module": "sqli",
+            "stage": "oob",
+            "tp": 1,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        }
+      }
+    },
+    "bxss": {
+      "findings_path": "bxss/output/findings_xss.json",
+      "findings_count": 1,
+      "positive_truth_count": 1,
+      "negative_truth_count": 1,
+      "stages": {
+        "regression": {
+          "predicted_count": 1,
+          "predicted_keys": [
+            [
+              "bxss",
+              "",
+              "p"
+            ]
+          ],
+          "metrics": {
+            "module": "bxss",
+            "stage": "regression",
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 1,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "control": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "bxss",
+            "stage": "control",
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 1,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "delta_if": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "bxss",
+            "stage": "delta_if",
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 1,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "oob": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "bxss",
+            "stage": "oob",
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 1,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        }
+      }
+    },
+    "ssrf": {
+      "findings_path": "bssrf/output/findings_ssrf.json",
+      "findings_count": 36,
+      "positive_truth_count": 3,
+      "negative_truth_count": 3,
+      "stages": {
+        "regression": {
+          "predicted_count": 6,
+          "predicted_keys": [
+            [
+              "ssrf",
+              "/fetch_file",
+              "file"
+            ],
+            [
+              "ssrf",
+              "/fetch_image",
+              "url"
+            ],
+            [
+              "ssrf",
+              "/ssrf/fetch_safe",
+              "url"
+            ],
+            [
+              "ssrf",
+              "/ssrf/file_safe",
+              "file"
+            ],
+            [
+              "ssrf",
+              "/ssrf/webhook_safe",
+              "callback"
+            ],
+            [
+              "ssrf",
+              "/webhook",
+              "callback"
+            ]
+          ],
+          "metrics": {
+            "module": "ssrf",
+            "stage": "regression",
+            "tp": 3,
+            "fp": 3,
+            "fn": 0,
+            "tn": 0,
+            "precision": 0.5,
+            "recall": 1.0,
+            "f1": 0.6667
+          }
+        },
+        "control": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "ssrf",
+            "stage": "control",
+            "tp": 0,
+            "fp": 0,
+            "fn": 3,
+            "tn": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "delta_if": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "ssrf",
+            "stage": "delta_if",
+            "tp": 0,
+            "fp": 0,
+            "fn": 3,
+            "tn": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "oob": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "ssrf",
+            "stage": "oob",
+            "tp": 0,
+            "fp": 0,
+            "fn": 3,
+            "tn": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        }
+      }
+    },
+    "cmdi": {
+      "findings_path": "bcmdi/output/findings_cmdi.json",
+      "findings_count": 3,
+      "positive_truth_count": 3,
+      "negative_truth_count": 3,
+      "stages": {
+        "regression": {
+          "predicted_count": 3,
+          "predicted_keys": [
+            [
+              "cmdi",
+              "/dns",
+              "domain"
+            ],
+            [
+              "cmdi",
+              "/ping",
+              "host"
+            ],
+            [
+              "cmdi",
+              "/process",
+              "cmd"
+            ]
+          ],
+          "metrics": {
+            "module": "cmdi",
+            "stage": "regression",
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "tn": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "control": {
+          "predicted_count": 3,
+          "predicted_keys": [
+            [
+              "cmdi",
+              "/dns",
+              "domain"
+            ],
+            [
+              "cmdi",
+              "/ping",
+              "host"
+            ],
+            [
+              "cmdi",
+              "/process",
+              "cmd"
+            ]
+          ],
+          "metrics": {
+            "module": "cmdi",
+            "stage": "control",
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "tn": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "delta_if": {
+          "predicted_count": 3,
+          "predicted_keys": [
+            [
+              "cmdi",
+              "/dns",
+              "domain"
+            ],
+            [
+              "cmdi",
+              "/ping",
+              "host"
+            ],
+            [
+              "cmdi",
+              "/process",
+              "cmd"
+            ]
+          ],
+          "metrics": {
+            "module": "cmdi",
+            "stage": "delta_if",
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "tn": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "oob": {
+          "predicted_count": 3,
+          "predicted_keys": [
+            [
+              "cmdi",
+              "/dns",
+              "domain"
+            ],
+            [
+              "cmdi",
+              "/ping",
+              "host"
+            ],
+            [
+              "cmdi",
+              "/process",
+              "cmd"
+            ]
+          ],
+          "metrics": {
+            "module": "cmdi",
+            "stage": "oob",
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "tn": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        }
+      }
+    },
+    "xxe": {
+      "findings_path": "bxe/output/findings_xxe.json",
+      "findings_count": 2,
+      "positive_truth_count": 3,
+      "negative_truth_count": 3,
+      "stages": {
+        "regression": {
+          "predicted_count": 2,
+          "predicted_keys": [
+            [
+              "xxe",
+              "/xxe/parse_safe",
+              "xml_body"
+            ],
+            [
+              "xxe",
+              "/xxe/soap_safe",
+              "xml_body"
+            ]
+          ],
+          "metrics": {
+            "module": "xxe",
+            "stage": "regression",
+            "tp": 0,
+            "fp": 1,
+            "fn": 3,
+            "tn": 2,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "control": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "xxe",
+            "stage": "control",
+            "tp": 0,
+            "fp": 0,
+            "fn": 3,
+            "tn": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "delta_if": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "xxe",
+            "stage": "delta_if",
+            "tp": 0,
+            "fp": 0,
+            "fn": 3,
+            "tn": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "oob": {
+          "predicted_count": 0,
+          "predicted_keys": [],
+          "metrics": {
+            "module": "xxe",
+            "stage": "oob",
+            "tp": 0,
+            "fp": 0,
+            "fn": 3,
+            "tn": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        }
+      }
+    }
+  }
+}
