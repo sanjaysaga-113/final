@@ -1,3 +1,6 @@
 http://127.0.0.1:8000/ping?host=127.0.0.1
 http://127.0.0.1:8000/dns?domain=example.com
 http://127.0.0.1:8000/process?cmd=ls
+http://127.0.0.1:8000/cmdi/ping_safe?host=127.0.0.1
+http://127.0.0.1:8000/cmdi/dns_safe?domain=example.com
+http://127.0.0.1:8000/cmdi/process_safe?cmd=ls

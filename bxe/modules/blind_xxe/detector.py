@@ -270,10 +270,9 @@ class BlindXXEDetector:
         
         baseline_avg = baseline["avg_time"]
         jitter_tolerance = baseline["jitter_tolerance"]
-        threshold = baseline_avg + self.LATENCY_THRESHOLD + jitter_tolerance
-        
-        logger.debug(f"Time-based detection threshold: {threshold:.2f}s "
-                    f"(baseline {baseline_avg:.2f}s + 2.5s + jitter {jitter_tolerance:.2f}s)")
+        logger.debug(
+            f"Time-based baseline: {baseline_avg:.2f}s, jitter tolerance: {jitter_tolerance:.2f}s"
+        )
         
         for payload, expected_delay, technique in time_payloads:
             try:
@@ -299,8 +298,13 @@ class BlindXXEDetector:
                 
                 elapsed = time.time() - start
                 
-                logger.debug(f"Time-based test ({technique}): {elapsed:.2f}s "
-                           f"(expected ~{expected_delay:.1f}s, threshold {threshold:.2f}s)")
+                dynamic_delta = max(jitter_tolerance, expected_delay * 0.6, 1.0)
+                threshold = baseline_avg + dynamic_delta
+
+                logger.debug(
+                    f"Time-based test ({technique}): {elapsed:.2f}s "
+                    f"(expected ~{expected_delay:.1f}s, threshold {threshold:.2f}s)"
+                )
                 
                 # Check if response is significantly delayed
                 if elapsed > threshold:
@@ -530,11 +534,7 @@ class BlindXXEDetector:
         
         # Persist features for ML training
         try:
-            persist_feature_vector(
-                feature_dict=features,
-                label="xxe",
-                is_vulnerable=findings.get("is_vulnerable", False)
-            )
+            persist_feature_vector(features)
             logger.debug(f"Features persisted for {parameter}")
         except Exception as e:
             logger.warning(f"Feature persistence error: {e}")
@@ -719,12 +719,12 @@ class BlindXXEDetector:
         # Determine vulnerability
         # Vulnerable if:
         # - OAST callback received OR
-        # - Time-based confirmed twice OR
-        # - Parser behavior detected twice AND control passed
+        # - Time-based confirmed twice AND control passed
+        # Parser-behavior-only signals are retained as evidence but are not
+        # sufficient for confirmation due to high FP risk on defensive endpoints.
         is_vulnerable = (
             len(oast_callbacks) > 0 or
-            (is_time_based and control_passed) or
-            (is_behavior and control_passed)
+            (is_time_based and control_passed)
         )
         
         # Extract ML features

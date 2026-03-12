@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="1244.788" timestamp="2026-03-08T18:17:56.199199+05:30" hostname="sanjaykumar"><testcase classname="test_cmdi_against_demo_app" name="test_cmdi_against_demo_app" time="1238.428" /></testsuite></testsuites>

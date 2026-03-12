@@ -20,6 +20,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from threading import Lock
 import logging
+import tempfile
+import time
 
 logger = logging.getLogger("ssrf_correlation")
 
@@ -27,8 +29,56 @@ logger = logging.getLogger("ssrf_correlation")
 INJECTION_EXPIRY_HOURS = 24
 
 # Database path
-CALLBACK_DB = os.path.join(os.path.dirname(__file__), "..", "output", "callbacks.db")
-INJECTIONS_DB = os.path.join(os.path.dirname(__file__), "..", "output", "injections.db")
+def _resolve_callback_db_path() -> str:
+    override = os.environ.get("SHADOWPROBE_SSRF_CALLBACK_DB")
+    if override:
+        return override
+
+    default_db = os.path.join(os.path.dirname(__file__), "..", "output", "callbacks.db")
+
+    if os.name == "nt":
+        norm = os.path.normpath(default_db)
+        if norm.startswith("\\\\wsl.localhost\\") or norm.startswith("\\\\"):
+            return os.path.join(tempfile.gettempdir(), "shadowprobe_ssrf_callbacks.db")
+
+    return default_db
+
+
+CALLBACK_DB = _resolve_callback_db_path()
+
+
+def _resolve_injections_db_path() -> str:
+    override = os.environ.get("SHADOWPROBE_SSRF_INJECTIONS_DB")
+    if override:
+        return override
+
+    default_db = os.path.join(os.path.dirname(__file__), "..", "output", "injections.db")
+
+    if os.name == "nt":
+        norm = os.path.normpath(default_db)
+        if norm.startswith("\\\\wsl.localhost\\") or norm.startswith("\\\\"):
+            return os.path.join(tempfile.gettempdir(), "shadowprobe_ssrf_injections.db")
+
+    return default_db
+
+
+INJECTIONS_DB = _resolve_injections_db_path()
+
+
+def _connect_sqlite(path: str, retries: int = 3):
+    last_error = None
+    for attempt in range(retries):
+        try:
+            conn = sqlite3.connect(path, timeout=30)
+            conn.execute("PRAGMA busy_timeout=30000;")
+            return conn
+        except sqlite3.OperationalError as e:
+            last_error = e
+            if "locked" in str(e).lower() and attempt < retries - 1:
+                time.sleep(0.2 * (attempt + 1))
+                continue
+            raise
+    raise last_error
 
 
 class InjectionTracker:
@@ -45,8 +95,8 @@ class InjectionTracker:
     def _init_db(self):
         """Initialize injections database."""
         os.makedirs(os.path.dirname(INJECTIONS_DB), exist_ok=True)
-        
-        conn = sqlite3.connect(INJECTIONS_DB)
+
+        conn = _connect_sqlite(INJECTIONS_DB)
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -72,7 +122,7 @@ class InjectionTracker:
         
         with self.lock:
             try:
-                conn = sqlite3.connect(INJECTIONS_DB)
+                conn = _connect_sqlite(INJECTIONS_DB)
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -92,7 +142,7 @@ class InjectionTracker:
         """Get injection by UUID."""
         with self.lock:
             try:
-                conn = sqlite3.connect(INJECTIONS_DB)
+                conn = _connect_sqlite(INJECTIONS_DB)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
@@ -111,7 +161,7 @@ class InjectionTracker:
         """Mark injection as correlated."""
         with self.lock:
             try:
-                conn = sqlite3.connect(INJECTIONS_DB)
+                conn = _connect_sqlite(INJECTIONS_DB)
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -127,7 +177,7 @@ class InjectionTracker:
         """Get all recorded injections."""
         with self.lock:
             try:
-                conn = sqlite3.connect(INJECTIONS_DB)
+                conn = _connect_sqlite(INJECTIONS_DB)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
@@ -177,8 +227,8 @@ class CallbackCorrelator:
             if not os.path.exists(CALLBACK_DB):
                 logger.warning("Callback database not found")
                 return []
-            
-            conn = sqlite3.connect(CALLBACK_DB)
+
+            conn = _connect_sqlite(CALLBACK_DB)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             

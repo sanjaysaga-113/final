@@ -1,12 +1,13 @@
 # Web Vulnerability Scanner (SQLi, XSS, SSRF, CMDi, XXE)
 
-Production-grade blind vulnerability scanner with five modules, recon, ML-assisted scoring, WAF evasion, and a vulnerable demo app. This README is the primary document for managers and engineers.
+Research-focused blind vulnerability scanner with five modules, recon, ML-assisted scoring hooks, WAF-evasion techniques, and a vulnerable demo app. This README is the primary document for operators and contributors.
 
 ---
 
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [Evaluation Results](#evaluation-results)
 - [Quick Start](#quick-start)
 - [Install & Environment](#install--environment)
 - [Frontend Setup & Usage](#frontend-setup--usage)
@@ -29,12 +30,34 @@ Production-grade blind vulnerability scanner with five modules, recon, ML-assist
 
 ---
 
+## Evaluation Results
+
+### Scan Efficiency Comparison
+
+![Scan Efficiency Comparison](docs/images/chart1_scan_efficiency.png)
+
+ShadowProbe ML-Prioritized achieves **64% reduction in parameters**, **76% reduction in requests**, and **73% reduction in scan time** compared to a traditional full scan, with no meaningful coverage loss.
+
+### Evaluation Dataset — Ground Truth
+
+![Evaluation Dataset Ground Truth](docs/images/chart2_ground_truth.png)
+
+100-endpoint benchmark across BSQLi, BXSS, SSRF/XXE, and Static Params categories. Overall: **28 TP, 69 TN, 1 FP, 2 FN** — Precision 96.6%, Recall 93.3%, F1 94.9%.
+
+### Comparative Performance Analysis
+
+![Comparative Performance Analysis](docs/images/chart3_performance.png)
+
+ShadowProbe Hybrid outperforms both pure heuristic and ML-only approaches: **94% precision**, **91% recall**, **6% false positive rate** — versus 62%/85%/38% for the heuristic baseline.
+
+---
+
 ## Module Matrix
 
 | Module | Techniques | OOB? | ML | Output | Key Paths |
 |--------|-----------|------|----|--------|-----------|
 | SQLi | Boolean, time-based, multi-probe, controls | No | Yes | bsqli/output/findings.* | bsqli/modules/blind_sqli/
-| BXSS | OOB callbacks (HTTP), UUID correlation | Yes | Stub | bxss/output/findings_xss.* | bxss/modules/blind_xss/
+| BXSS | OOB callbacks (HTTP), fixed payload callback profile | Yes | Stub | bxss/output/findings_xss.* | bxss/modules/blind_xss/
 | SSRF | OOB callbacks (HTTP/DNS), injection tracking | Yes | No | bssrf/output/findings_ssrf.* | bssrf/modules/blind_ssrf/
 | CMDi | Time-based, OS-aware, controls | Optional | Stub | bcmdi/output/findings_cmdi.* | bcmdi/modules/blind_cmdi/
 | XXE | OOB (HTTP/DNS), time-based, parser behavior, controls | Optional | Yes | bxe/output/findings_xxe.* | bxe/modules/blind_xxe/
@@ -243,9 +266,10 @@ Each finding includes type, parameter/endpoint, technique, confidence, evidence,
 - ML features: delta_ratio, jitter variance, entropy
 
 ### BXSS
-- UUID-tagged payloads across query, body, headers
+- Fixed payload profile currently hardcoded to `https://xss.report/c/srikanthreddy334` (decoded + URL-encoded variants)
 - Flask OOB callback server with SQLite + replay protection
-- Correlation engine matches callbacks to injections; confidence based on repeats
+- Correlation engine records callback evidence and timing for injected requests
+- Output is file-first (`bxss/output/findings_xss.txt`, `bxss/output/findings_xss.json`) with minimal live terminal logs
 
 ### SSRF
 - HTTP/DNS payloads, callback correlation, injection tracking
@@ -305,6 +329,9 @@ Quick start:
 - PROJECT_GUIDE.md – contributor notes, integration/testing checklist
 - Module READMEs – per-module usage and internals (bxss, bssrf, bcmdi, bxe)
 - demo_vuln_app/README.md – demo endpoints and steps
+- docs/EVALUATION_PROTOCOL.md – auditable metric definitions + reproducible evaluation commands
+- docs/ABLATION_PROTOCOL.md – staged ablation plan (regression → control → ML → OOB)
+- docs/CONFERENCE_REVISION_CHECKLIST.md – reviewer-comment implementation checklist
 
 Redundant inventories/summaries removed for clarity.
 
@@ -318,11 +345,11 @@ Only scan targets you are authorized to test. Modules include safety measures (c
 
 ## Project Overview
 
-A production-grade automated scanner for detecting **Blind SQL Injection**, **Blind XSS**, **Blind SSRF**, **Blind Command Injection**, and **Blind XXE** vulnerabilities with ML-enhanced accuracy and WAF evasion capabilities.
+A modular scanner for detecting **Blind SQL Injection**, **Blind XSS**, **Blind SSRF**, **Blind Command Injection**, and **Blind XXE** vulnerabilities, with explicit confidence controls and reproducible evaluation tooling.
 
 ### Key Innovations
 
-✅ **ML-Enhanced Detection** - IsolationForest with delta_ratio normalization (40-60% accuracy gain)  
+✅ **ML-Enhanced Detection Hooks** - IsolationForest scoring with `delta_ratio` and related timing features  
 ✅ **Production Callback Server** - SQLite persistence, replay protection, async processing, automatic startup  
 ✅ **Five Module Coverage** - SQLi, XSS, SSRF, CMDi, XXE detection in one framework  
 ✅ **WAF Evasion** - Adaptive rate limiting, header rotation, payload obfuscation  
@@ -402,14 +429,14 @@ python main.py --scan bssrf -f targets.txt --listener http://attacker.com:5000 -
 
 | Feature | Impact | Implementation |
 |---------|--------|----------------|
-| **Delta ratio normalization** | ⭐⭐⭐ 40-60% accuracy gain | `delta_ratio = delta / baseline_time` |
+| **Delta ratio normalization** | Timing normalization signal | `delta_ratio = delta / baseline_time` |
 | **Warm-up phase (N≥30)** | ⭐⭐⭐ 70% FP reduction | Skip ML until 30 baseline samples |
 | **Response entropy** | ⭐⭐ Anomaly detection | Shannon entropy of response body |
 | **Jitter variance** | ⭐⭐ Confidence adjustment | Baseline timing std dev |
 | **Time bucket** (BXSS) | ⭐⭐ 0-10s/10-60s/>60s | Categorical delay classification |
 | **UA fingerprint** (BXSS) | ⭐⭐⭐ 40% FP reduction | Browser vs bot detection |
 | **Callback repeat count** | ⭐⭐ Ground truth labeling | Multiple callbacks = higher confidence |
-| **Per-endpoint models** | ⭐⭐ 15-30% accuracy gain | Separate models for /login, /search, etc. |
+| **Per-endpoint models** | Planned extension | Separate models for /login, /search, etc. |
 
 ### WAF Evasion
 
@@ -1068,8 +1095,8 @@ grep -c "VULNERABLE" bsqli/output/findings.txt
 **Q: Why IsolationForest over deep learning?**
 > "IsolationForest aligns with zero-knowledge scanning requirements. Neural networks require labeled datasets unavailable during initial deployment. IsolationForest operates unsupervised with N≥10 samples, enabling immediate deployment."
 
-**Q: How does delta_ratio improve accuracy?**
-> "Delta ratio normalizes timing delays: `delta_ratio = delta / baseline_time`. A 5-second delay is significant for a 50ms endpoint but normal for a 2-second endpoint. This single feature improved accuracy by 40-60% in testing."
+**Q: How does delta_ratio help detection stability?**
+> "Delta ratio normalizes timing delays: `delta_ratio = delta / baseline_time`. A 5-second delay is significant for a 50ms endpoint but less significant for a 2-second endpoint. Quantitative impact should be reported from ablation outputs (see `evaluation/run_ablation.py`)."
 
 **Q: What about false positives from slow servers?**
 > "We implemented four layers of false positive elimination:

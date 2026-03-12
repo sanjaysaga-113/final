@@ -18,8 +18,9 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from threading import Lock
 
-# Injection expiration window (matches callback_server.py)
-INJECTION_EXPIRY_HOURS = 24
+# Injection expiration window in hours (default: 7 days for delayed stored-XSS callbacks).
+INJECTION_EXPIRY_HOURS = int(os.environ.get("SHADOWPROBE_BXSS_EXPIRY_HOURS", "168"))
+INJECTION_STORE = os.path.join(os.path.dirname(__file__), "..", "output", "injections.json")
 
 
 class InjectionTracker:
@@ -31,6 +32,29 @@ class InjectionTracker:
     def __init__(self):
         self.injections = {}
         self.lock = Lock()
+        self._load_from_disk()
+
+    def _load_from_disk(self):
+        """Load persisted injections so delayed callbacks can be correlated across runs."""
+        try:
+            if os.path.exists(INJECTION_STORE):
+                with open(INJECTION_STORE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        self.injections = data
+        except Exception:
+            # Keep in-memory tracker usable even if persisted state is malformed.
+            self.injections = {}
+
+    def _save_to_disk(self):
+        """Persist tracked injections for long-lived callback validation."""
+        try:
+            os.makedirs(os.path.dirname(INJECTION_STORE), exist_ok=True)
+            with open(INJECTION_STORE, "w", encoding="utf-8") as f:
+                json.dump(self.injections, f, indent=2)
+        except Exception:
+            # Correlation should not fail if persistence write fails.
+            pass
     
     def record_injection(self, uuid: str, url: str, parameter: str, payload: str, timestamp: str = None):
         """
@@ -48,6 +72,7 @@ class InjectionTracker:
                 "timestamp": timestamp,
                 "correlated": False,
             }
+            self._save_to_disk()
     
     def get_injection(self, uuid: str) -> Optional[Dict]:
         """
@@ -63,6 +88,7 @@ class InjectionTracker:
         with self.lock:
             if uuid in self.injections:
                 self.injections[uuid]["correlated"] = True
+                self._save_to_disk()
     
     def get_all_injections(self) -> Dict:
         """
@@ -213,12 +239,12 @@ def save_findings(findings: List[Dict], output_dir: str = None):
     
     # JSON output
     json_file = os.path.join(output_dir, "findings_xss.json")
-    with open(json_file, 'w') as f:
+    with open(json_file, 'w', encoding='utf-8') as f:
         json.dump(scored_findings, f, indent=2)
 
     # Text output (human-friendly)
     txt_file = os.path.join(output_dir, "findings_xss.txt")
-    with open(txt_file, 'w') as f:
+    with open(txt_file, 'w', encoding='utf-8') as f:
         f.write("=" * 80 + "\n")
         f.write("BLIND XSS FINDINGS\n")
         f.write("=" * 80 + "\n\n")

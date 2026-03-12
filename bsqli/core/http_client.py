@@ -70,7 +70,7 @@ class HttpClient:
         self.rotate_headers = rotate_headers
         self.rate_limiter = RateLimiter()
 
-    def get(self, url, params=None, headers=None, cookies=None):
+    def get(self, url, params=None, headers=None, cookies=None, timeout=None):
         try:
             # Extract host for rate limiting
             host = urlparse(url).netloc
@@ -96,7 +96,7 @@ class HttpClient:
                 params=params,
                 headers=request_headers,
                 cookies=cookies,
-                timeout=self.timeout,
+                timeout=timeout if timeout is not None else self.timeout,
                 allow_redirects=True,
             )
             
@@ -108,7 +108,7 @@ class HttpClient:
             logger.debug("HTTP GET error: %s", e)
             raise
 
-    def post(self, url, data=None, json=None, headers=None, cookies=None, files=None):
+    def post(self, url, data=None, json=None, headers=None, cookies=None, files=None, timeout=None):
         try:
             host = urlparse(url).netloc
 
@@ -132,7 +132,7 @@ class HttpClient:
                 headers=request_headers,
                 cookies=cookies,
                 files=files,
-                timeout=self.timeout,
+                timeout=timeout if timeout is not None else self.timeout,
                 allow_redirects=True,
             )
 
@@ -141,3 +141,10 @@ class HttpClient:
         except requests.RequestException as e:
             logger.debug("HTTP POST error: %s", e)
             raise
+
+    def get_random_user_agent(self) -> str:
+        """Return a random User-Agent string from the header pool."""
+        try:
+            return get_random_headers().get("User-Agent", "")
+        except Exception:
+            return ""

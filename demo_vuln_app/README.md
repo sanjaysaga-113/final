@@ -1,88 +1,77 @@
-# Vulnerable Demo App (Local Only)
+# ShadowProbe Evaluation Benchmark App (Local Only)
 
-Purpose-built for demonstrating this scanner live. Do NOT expose publicly.
+This app now supports conference-review style evaluation with auditable ground truth, per-module vulnerable/safe pairs, and event logging.
 
-## What it provides
+## Why this update
 
-### SQL Injection (BSQLi)
-- `/search?name=...`: Intentionally vulnerable SQL query (string concatenation).
-  - Also simulates time-based delays if payload contains `WAITFOR DELAY '00:00:N'` or `SLEEP(N)`.
+Reviewer feedback asked for auditable metrics, clearer methodology, and explicit false-positive/false-negative analysis.  
+This benchmark app addresses that by exposing:
 
-### Cross-Site Scripting (Blind XSS)
-- `/comment?text=...`: Stores unsanitized comments and reflects them.
-  - Simulates a "blind XSS" admin visit by parsing the stored text for URLs like `http(s)://<host>/c/<UUID>` or `//<host>/c/<UUID>` and calls `http://<host>/x.js?id=<UUID>` to trigger the callback server.
+- Vulnerable endpoints (`*_vuln` or legacy routes)
+- Safe control endpoints (`*_safe`)
+- Machine-readable ground truth API
+- Event logging API and JSONL audit trail
 
-### Server-Side Request Forgery (SSRF)
-- `/fetch_image?url=...`: Fetches an image from user-supplied URL (vulnerable to SSRF).
-- `/webhook?callback=...`: Registers a webhook callback (vulnerable to SSRF).
-- `/fetch_file?file=...`: Fetches a file from user-supplied URL (vulnerable to SSRF).
+## Evaluation APIs
 
-### Command Injection (Blind CMDi)
-- `/ping?host=...`: Pings a host with user-supplied hostname (vulnerable to blind CMDi).
-  - Simulates time-based delays if payload contains `sleep N`, `timeout /t N`, or `ping -n N`.
-- `/dns?domain=...`: Performs DNS lookup on user-supplied domain (vulnerable to blind CMDi).
-  - Simulates time-based delays if payload contains `sleep N`, `timeout /t N`, or `ping -n N`.
-- `/process?cmd=...`: Processes a command parameter (vulnerable to blind CMDi).
-  - Simulates time-based delays if payload contains `sleep N`, `timeout /t N`, or `ping -n N`.
+- Ground truth: `/_shadowprobe/ground-truth`
+- Runtime events: `/_shadowprobe/events`
+- Reset benchmark state: `/_shadowprobe/reset` (POST)
+- Event file: `demo_vuln_app/output/events.jsonl`
+
+## Module endpoint pairs
+
+- SQLi
+  - Vulnerable: `/search?name=...`
+  - Safe: `/sqli/search_safe?name=...`
+- BXSS
+  - Vulnerable: `/comment?text=...`
+  - Safe: `/xss/comment_safe?text=...`
+- SSRF
+  - Vulnerable: `/fetch_image?url=...`, `/webhook?callback=...`, `/fetch_file?file=...`
+  - Safe: `/ssrf/fetch_safe?url=...`, `/ssrf/webhook_safe?callback=...`, `/ssrf/file_safe?file=...`
+- CMDi
+  - Vulnerable: `/ping?host=...`, `/dns?domain=...`, `/process?cmd=...`
+  - Safe: `/cmdi/ping_safe?...`, `/cmdi/dns_safe?...`, `/cmdi/process_safe?...`
+- XXE
+  - Vulnerable: `/api/parse`, `/soap`, `/upload`
+  - Safe: `/xxe/parse_safe`, `/xxe/soap_safe`, `/xxe/upload_safe`
 
 ## Quick start
 
-### 1. Start the vulnerable app (new terminal):
+1) Start benchmark app:
 
 ```bash
 python demo_vuln_app/app.py --port 8000
 ```
 
-### 2. Test SQL Injection (BSQLi):
+2) Inspect ground truth:
 
 ```bash
-echo http://127.0.0.1:8000/search?name=test > demo_vuln_app/urls_sqli.txt
-python main.py --recon -f demo_vuln_app/urls_sqli.txt --scan sqli --threads 5
+curl http://127.0.0.1:8000/_shadowprobe/ground-truth
 ```
 
-Expect boolean-based detection (content length/similarity changes). Time-based may also trigger due to the delay simulation.
-
-### 3. Test Blind XSS (BXSS):
+3) Run scanner module(s) using fixture files in `demo_vuln_app/`:
 
 ```bash
-echo http://127.0.0.1:8000/comment?text=hello > demo_vuln_app/urls_bxss.txt
-python main.py --recon -f demo_vuln_app/urls_bxss.txt --scan bxss --listener http://127.0.0.1:5000 --wait 10
+python main.py -f demo_vuln_app/urls_sqli.txt --scan sqli --threads 5
+python main.py -f demo_vuln_app/urls_bxss.txt --scan bxss --listener http://127.0.0.1:5000 --wait 10
+python main.py -f demo_vuln_app/urls_ssrf.txt --scan ssrf --listener http://127.0.0.1:5000 --wait 10
+python main.py -f demo_vuln_app/urls_cmdi.txt --scan cmdi --threads 5
 ```
 
-The scanner injects payloads into `text`, the app simulates an admin "view" and calls the listener. You should see callbacks and correlated findings in `bxss/output/`.
-
-### 4. Test SSRF (BSSRF):
+4) Evaluate metrics against ground truth:
 
 ```bash
-echo http://127.0.0.1:8000/fetch_image?url=http://example.com > demo_vuln_app/urls_ssrf.txt
-python main.py --recon -f demo_vuln_app/urls_ssrf.txt --scan ssrf --threads 5
-```
-
-### 5. Test Command Injection (Blind CMDi):
-
-```bash
-cat demo_vuln_app/urls_cmdi.txt
-# Or run directly:
-python main.py --recon -f demo_vuln_app/urls_cmdi.txt --scan cmdi --threads 5
-```
-
-Expected findings for CMDi:
-- `/ping?host=127.0.0.1` → Vulnerable parameter: `host`
-- `/dns?domain=example.com` → Vulnerable parameter: `domain`
-- `/process?cmd=ls` → Vulnerable parameter: `cmd`
-
-Payloads that will trigger delays:
-```
-; sleep 3
-; sleep 5
-; sleep 7
-&& sleep 3
-|| sleep 3
-| sleep 3
+python demo_vuln_app/evaluate_results.py --module sqli
+python demo_vuln_app/evaluate_results.py --module bxss
+python demo_vuln_app/evaluate_results.py --module ssrf
+python demo_vuln_app/evaluate_results.py --module cmdi
+python demo_vuln_app/evaluate_results.py --module xxe
 ```
 
 ## Notes
-- This app is intentionally vulnerable. Only run it locally.
-- For BXSS, payloads commonly reference `.../c/<UUID>`; the app maps those to `/x.js?id=<UUID>` to align with the callback server.
-- For CMDi, the app simulates command execution by detecting injected `sleep`, `timeout`, and `ping` commands and delaying responses accordingly.
-- Requirements are already included in the project (Flask, requests).
+
+- This app is intentionally vulnerable in designated routes; run only in local lab environments.
+- Legacy vulnerable routes are preserved for compatibility with existing tests.
+- Safe endpoints are designed as control baselines to support FP/FN reporting in your paper revisions.

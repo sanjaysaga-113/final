@@ -1,3 +1,6 @@
 http://127.0.0.1:8000/fetch_image?url=PAYLOAD
 http://127.0.0.1:8000/webhook?callback=PAYLOAD
 http://127.0.0.1:8000/fetch_file?file=PAYLOAD
+http://127.0.0.1:8000/ssrf/fetch_safe?url=PAYLOAD
+http://127.0.0.1:8000/ssrf/webhook_safe?callback=PAYLOAD
+http://127.0.0.1:8000/ssrf/file_safe?file=PAYLOAD

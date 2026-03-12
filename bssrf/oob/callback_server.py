@@ -22,6 +22,8 @@ from typing import Dict, List, Optional
 import logging
 from queue import Queue
 import hashlib
+import socket
+import tempfile
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +33,23 @@ logging.basicConfig(
 logger = logging.getLogger("callback_server")
 
 # Configuration
-CALLBACK_DB = os.path.join(os.path.dirname(__file__), "..", "output", "callbacks.db")
+def _resolve_callback_db_path() -> str:
+    override = os.environ.get("SHADOWPROBE_SSRF_CALLBACK_DB")
+    if override:
+        return override
+
+    default_db = os.path.join(os.path.dirname(__file__), "..", "output", "callbacks.db")
+
+    # UNC/WSL-mounted workspaces on Windows often cause SQLite lock issues.
+    if os.name == "nt":
+        norm = os.path.normpath(default_db)
+        if norm.startswith("\\\\wsl.localhost\\") or norm.startswith("\\\\"):
+            return os.path.join(tempfile.gettempdir(), "shadowprobe_ssrf_callbacks.db")
+
+    return default_db
+
+
+CALLBACK_DB = _resolve_callback_db_path()
 INJECTION_EXPIRY_HOURS = 24  # Ignore callbacks for injections older than 24h
 PROCESSING_QUEUE = Queue()
 REPLAY_CHECK_LOCK = Lock()
@@ -39,11 +57,28 @@ REPLAY_CHECK_LOCK = Lock()
 app = Flask(__name__)
 
 
+def _connect_db():
+    conn = sqlite3.connect(CALLBACK_DB, timeout=30)
+    try:
+        conn.execute("PRAGMA busy_timeout=30000;")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+    except sqlite3.OperationalError as e:
+        logger.warning("WAL mode unavailable for callback DB, falling back to DELETE journal mode: %s", e)
+        try:
+            conn.execute("PRAGMA journal_mode=DELETE;")
+        except sqlite3.OperationalError:
+            pass
+    return conn
+
+
 def _init_db():
     """Initialize SQLite database with schema."""
     os.makedirs(os.path.dirname(CALLBACK_DB), exist_ok=True)
     
-    conn = sqlite3.connect(CALLBACK_DB)
+    conn = _connect_db()
     cursor = conn.cursor()
     
     # Callbacks table
@@ -68,6 +103,13 @@ def _init_db():
     logger.info(f"Database initialized: {CALLBACK_DB}")
 
 
+def _is_port_in_use(host: str, port: int) -> bool:
+    check_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex((check_host, int(port))) == 0
+
+
 def save_callback(callback_data):
     """Save callback to SQLite database."""
     try:
@@ -76,7 +118,7 @@ def save_callback(callback_data):
         replay_hash = hashlib.md5(replay_key.encode()).hexdigest()
         callback_data['replay_hash'] = replay_hash
         
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         cursor = conn.cursor()
         
         try:
@@ -109,7 +151,7 @@ def save_callback(callback_data):
 def load_callbacks() -> List[Dict]:
     """Load all callbacks from database."""
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -196,7 +238,12 @@ def catch_all(path):
     # Queue for async processing
     PROCESSING_QUEUE.put(callback_data)
     
-    # Return immediately
+    # Return immediately with explicit response (prevents Flask TypeError/500)
+    return jsonify({
+        'status': 'received',
+        'uuid': uuid,
+        'path': callback_data['path']
+    }), 200
 
 
 @app.route('/api/callbacks', methods=['GET'])
@@ -217,7 +264,7 @@ def get_callbacks():
 def check_uuid(uuid):
     """Check if a specific UUID has received a callback."""
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -250,7 +297,7 @@ def check_uuid(uuid):
 def clear_callbacks():
     """Clear all callbacks (for testing)."""
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM callbacks")
         conn.commit()
@@ -299,8 +346,19 @@ def start_server_background(host='0.0.0.0', port=5000):
         time.sleep(2)  # Wait for server to start
         # ... rest of code ...
     """
+    if _is_port_in_use(host, port):
+        logger.warning("Callback server port %s is already in use; reusing existing callback server.", port)
+        return None
+
     # Initialize database
-    _init_db()
+    try:
+        _init_db()
+    except sqlite3.OperationalError as e:
+        logger.warning("Callback DB init failed (continuing without restarting callback server): %s", e)
+        if _is_port_in_use(host, port):
+            logger.info("Existing callback server detected on port %s; proceeding.", port)
+            return None
+        raise
     
     # Start background processor thread
     processor_thread = Thread(target=process_queue, daemon=True)
@@ -312,6 +370,9 @@ def start_server_background(host='0.0.0.0', port=5000):
     
     # Start Flask server in background thread
     def run_flask():
+        # Prevent Werkzeug from reusing an invalid server FD in threaded mode
+        os.environ.pop("WERKZEUG_SERVER_FD", None)
+        os.environ.pop("WERKZEUG_RUN_MAIN", None)
         app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
     
     server_thread = Thread(target=run_flask, daemon=True)

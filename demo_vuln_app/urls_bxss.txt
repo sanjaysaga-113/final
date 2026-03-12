@@ -1,1 +1,6 @@
 http://127.0.0.1:8000/comment?text=hello
+http://127.0.0.1:8000/xss/comment_safe?text=hello
+http://127.0.0.1:8000/bench/v/comment_1?text=hello
+http://127.0.0.1:8000/bench/s/xss_comment_safe_1?text=hello
+http://127.0.0.1:8000/bench/v/comment_2?text=hello
+http://127.0.0.1:8000/bench/s/xss_comment_safe_2?text=hello

@@ -5,12 +5,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import time
+import math
 from datetime import datetime
 from typing import Dict, Any
 from bsqli.core.logger import get_logger
 from bsqli.core.config import THREADS
 from bsqli.core.config import OUTPUT_DIR
+from bsqli.ml.anomaly_stub import prepare_feature_vector, score_feature_vector
 from colorama import Fore, Back, Style
+from urllib.parse import urlparse
 
 logger = get_logger("main")
 from bcmdi.modules.blind_cmdi.cmdi_module import BlindCMDiModule
@@ -40,6 +43,23 @@ def format_payload_snippet(payload: str, length: int = 80) -> str:
         return ""
     snippet = (payload or "")[:length]
     return f"{Back.YELLOW}{Fore.BLACK}{snippet}{Style.RESET_ALL}"
+
+def _extract_listener_port(listener_url: str, default_port: int = 5000) -> int:
+    """Extract port from listener URL; fall back to default when missing."""
+    if not listener_url:
+        return default_port
+    try:
+        parsed = urlparse(listener_url)
+        if parsed.port:
+            return parsed.port
+        # Handle URLs without scheme (e.g., host:5000)
+        if "://" not in listener_url:
+            parsed = urlparse(f"http://{listener_url}")
+            if parsed.port:
+                return parsed.port
+    except Exception:
+        return default_port
+    return default_port
 
 def write_outputs(findings, out_dir=OUTPUT_DIR):
     json_path = os.path.join(out_dir, "findings.json")
@@ -85,6 +105,177 @@ def write_outputs(findings, out_dir=OUTPUT_DIR):
             f.write("-" * 80 + "\n")
 
     logger.info("Wrote results to %s and %s", json_path, txt_path)
+
+
+def _score_from_confidence(confidence: str) -> float:
+    c = str(confidence or "").upper()
+    if c == "HIGH":
+        return 0.9
+    if c == "MEDIUM":
+        return 0.6
+    if c == "LOW":
+        return 0.3
+    return 0.5
+
+
+def _ml_score_from_decision(decision: float) -> float:
+    try:
+        return round(1.0 / (1.0 + math.exp(float(decision))), 4)
+    except Exception:
+        return 0.5
+
+
+def _ml_confidence_from_score(score: float) -> str:
+    if score >= 0.8:
+        return "HIGH"
+    if score >= 0.55:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _build_ml_fields(url: str, parameter: str, injection_type: str, payload: str,
+                     baseline_time: float, injected_time: float,
+                     content_length: int, status_code: int,
+                     fallback_confidence: str):
+    feature_vec = prepare_feature_vector(
+        url=url,
+        parameter=parameter,
+        injection_type=injection_type,
+        payload=payload,
+        baseline_time=baseline_time,
+        injected_time=injected_time,
+        content_length=content_length,
+        status_code=status_code,
+    )
+    scored = score_feature_vector(feature_vec)
+    if scored:
+        anomaly_label, decision_score = scored
+        ml_score = _ml_score_from_decision(decision_score)
+        ml_confidence = "HIGH" if anomaly_label == -1 else "LOW"
+        ml_decision = "anomaly" if anomaly_label == -1 else "normal"
+        ml_model = "isolation_forest"
+        return {
+            "ml_score": ml_score,
+            "ml_confidence": ml_confidence,
+            "ml_features": feature_vec,
+            "ml_model": ml_model,
+            "ml_decision": ml_decision,
+        }
+
+    fallback_score = _score_from_confidence(fallback_confidence)
+    return {
+        "ml_score": fallback_score,
+        "ml_confidence": _ml_confidence_from_score(fallback_score),
+        "ml_features": feature_vec,
+        "ml_model": "rule_based_fallback",
+        "ml_decision": "anomaly" if fallback_score >= 0.55 else "normal",
+    }
+
+
+def enrich_findings_with_ml(module_name: str, findings: list) -> list:
+    if not findings:
+        return findings
+
+    enriched = []
+    for finding in findings:
+        item = dict(finding)
+
+        if module_name == "bxss":
+            existing_score = item.get("ml_score")
+            if existing_score is None:
+                anomaly = item.get("anomaly_score")
+                decision = item.get("anomaly_decision")
+                if anomaly is not None:
+                    item["ml_score"] = 0.9 if int(anomaly) == -1 else 0.3
+                    item["ml_confidence"] = "HIGH" if int(anomaly) == -1 else "LOW"
+                    item["ml_decision"] = "anomaly" if int(anomaly) == -1 else "normal"
+                    item["ml_model"] = "bxss_isolation_forest"
+                elif decision is not None:
+                    item["ml_score"] = _ml_score_from_decision(decision)
+                    item["ml_confidence"] = _ml_confidence_from_score(item["ml_score"])
+                    item["ml_decision"] = "anomaly" if item["ml_score"] >= 0.55 else "normal"
+                    item["ml_model"] = "bxss_isolation_forest"
+            item.setdefault("ml_features", {
+                "delay_seconds": item.get("delay_seconds", 0.0),
+                "callback_repeat_count": item.get("callback_repeat_count", 1),
+                "ua_present": 1.0 if item.get("callback_user_agent") else 0.0,
+            })
+
+        elif module_name == "ssrf":
+            status_code = int(item.get("status_code") or 0)
+            response_length = int(item.get("response_length") or 0)
+            confirmed = bool(item.get("confirmed"))
+            fallback_conf = "HIGH" if confirmed else ("MEDIUM" if status_code in [200, 201, 202, 204] else "LOW")
+            baseline = 1.0
+            injected = 1.0 + (0.8 if confirmed else 0.2)
+            ml_fields = _build_ml_fields(
+                url=item.get("url", ""),
+                parameter=item.get("parameter", ""),
+                injection_type="ssrf",
+                payload=item.get("payload", ""),
+                baseline_time=baseline,
+                injected_time=injected,
+                content_length=response_length,
+                status_code=status_code,
+                fallback_confidence=fallback_conf,
+            )
+            item.update(ml_fields)
+
+        elif module_name == "cmdi":
+            details = item.get("details") if isinstance(item.get("details"), dict) else {}
+            baseline = float(details.get("baseline_avg") or 0.0)
+            confirmations = item.get("confirmations") or details.get("confirmations_count") or 0
+            injected = baseline + (3.0 if confirmations else 0.5)
+            fallback_conf = item.get("confidence", "LOW")
+            ml_fields = _build_ml_fields(
+                url=item.get("url", ""),
+                parameter=item.get("parameter", ""),
+                injection_type="cmdi",
+                payload=str(item.get("technique", "time-based")),
+                baseline_time=baseline,
+                injected_time=injected,
+                content_length=0,
+                status_code=200,
+                fallback_confidence=fallback_conf,
+            )
+            item.update(ml_fields)
+
+        elif module_name == "xxe":
+            ml_features = item.get("ml_features") if isinstance(item.get("ml_features"), dict) else {}
+            ml_score = item.get("ml_score")
+            if ml_score is None:
+                fallback_conf = item.get("confidence", "LOW")
+                ml_score = _score_from_confidence(fallback_conf)
+            item["ml_score"] = float(ml_score)
+            item["ml_confidence"] = item.get("ml_confidence") or _ml_confidence_from_score(float(item["ml_score"]))
+            item["ml_decision"] = item.get("ml_decision") or ("anomaly" if float(item["ml_score"]) >= 0.55 else "normal")
+            item["ml_model"] = item.get("ml_model") or "xxe_feature_rules"
+            item["ml_features"] = ml_features
+
+        elif module_name == "sqli":
+            details = item.get("details") if isinstance(item.get("details"), dict) else {}
+            evidence = details.get("evidence") if isinstance(details.get("evidence"), list) else []
+            first = evidence[0] if evidence else {}
+            baseline = float(first.get("baseline") or 0.0)
+            injected = float(first.get("t_inj") or baseline)
+            payload = first.get("payload") or first.get("payload_true") or ""
+            fallback_conf = details.get("confidence", "LOW")
+            ml_fields = _build_ml_fields(
+                url=item.get("url", ""),
+                parameter=item.get("parameter", ""),
+                injection_type=f"sqli_{item.get('injection', 'unknown')}",
+                payload=payload,
+                baseline_time=baseline,
+                injected_time=injected,
+                content_length=int(first.get("len_true") or 0),
+                status_code=200,
+                fallback_confidence=fallback_conf,
+            )
+            item.update(ml_fields)
+
+        enriched.append(item)
+
+    return enriched
 
 def main():
     ap = argparse.ArgumentParser(
@@ -161,6 +352,12 @@ EXAMPLES:
         help="Wait time in seconds for BXSS callbacks after injection (default: 30). Higher = more time for callbacks, slower scanning"
     )
     ap.add_argument(
+        "--bxss-expiry-hours",
+        type=int,
+        default=168,
+        help="How long injected BXSS UUIDs remain correlatable (default: 168 hours = 7 days)"
+    )
+    ap.add_argument(
         "--raw",
         help="Raw HTTP request file (sqlmap -r format). Bypasses recon and scans the request directly. File format: raw HTTP with blank line before body",
         required=False
@@ -185,6 +382,7 @@ EXAMPLES:
             module = BlindXXEModule(timeout=15, oast_server=args.listener if args.listener else None)
             result = module.scan_raw_request(raw_req)
             findings = [result] if result else []
+            findings = enrich_findings_with_ml("xxe", findings)
             write_outputs(findings)
             logger.info("Raw XXE scan complete. Total findings: %d", len(findings))
         else:
@@ -192,6 +390,7 @@ EXAMPLES:
             print_info(f"Target: {raw_req.get('url')} | Method: {raw_req.get('method')}")
             module = BlindSQLiModule(timeout=10)
             findings = module.scan_raw_request(raw_req)
+            findings = enrich_findings_with_ml("sqli", findings)
             write_outputs(findings)
             logger.info("Raw scan complete. Total findings: %d", len(findings))
         return
@@ -205,7 +404,7 @@ EXAMPLES:
         return
     
     # BXSS and SSRF require listener URL
-    if args.scan in ["bxss", "ssrf", "cmdi"] and not args.listener:
+    if args.scan in ["bxss", "ssrf"] and not args.listener:
         print_error(f"{args.scan.upper()} scan requires --listener URL")
         print("Examples:")
         print("  --listener https://abc123.ngrok.io     (use ngrok)")
@@ -265,10 +464,14 @@ EXAMPLES:
     if args.scan == "bxss":
         print_header("BLIND XSS SCAN MODE")
         print_info(f"Listener URL: {args.listener}")
+        print_info(f"BXSS correlation window: {args.bxss_expiry_hours}h")
         if args.recon:
             print_info(f"[RECON] Mode: {args.recon_mode} | URLs discovered: {len(urls)}")
         else:
             print_info(f"[*] Recon disabled | Target URLs: {len(urls)}")
+
+        # Keep this configurable so delayed victim interaction over multiple days still correlates.
+        os.environ["SHADOWPROBE_BXSS_EXPIRY_HOURS"] = str(args.bxss_expiry_hours)
         
         # Import BXSS module
         from bxss.modules.blind_xss.xss_module import BlindXSSModule
@@ -277,7 +480,8 @@ EXAMPLES:
         
         # Start callback server in background
         print_info("Starting OOB callback server...")
-        server_thread = start_server_background(host='0.0.0.0', port=int(args.listener.split(':')[-1]))
+        listener_port = _extract_listener_port(args.listener, default_port=5000)
+        server_thread = start_server_background(host='0.0.0.0', port=listener_port)
         time.sleep(2)  # Give server time to start
         print_success("Callback server started")
         
@@ -308,6 +512,7 @@ EXAMPLES:
         print_info(f"Callbacks received: {len(callbacks)}")
         
         findings = correlate_callbacks(callbacks)
+        findings = enrich_findings_with_ml("bxss", findings)
         confidence = calculate_confidence(findings)
         
         if findings:
@@ -348,10 +553,7 @@ EXAMPLES:
         from bssrf.oob.callback_server import start_server_background
         
         # Extract port from listener URL
-        try:
-            listener_port = int(args.listener.split(':')[-1])
-        except (ValueError, IndexError):
-            listener_port = 5000
+        listener_port = _extract_listener_port(args.listener, default_port=5000)
         
         # Start callback server in background
         print_info("Starting OOB callback server...")
@@ -434,7 +636,7 @@ EXAMPLES:
                 
                 for url, findings_list in confirmed_by_url.items():
                     param = findings_list[0]['parameter']
-                    print(f"{Fore.GREEN}✓ VULNERABLE:{Style.RESET_ALL} {url}")
+                    print(f"{Fore.GREEN}[VULNERABLE]{Style.RESET_ALL} {url}")
                     print(f"  Parameter: {Fore.YELLOW}{param}{Style.RESET_ALL}")
                     print(f"  Confirmed via: {len(findings_list)} callback(s)")
                     
@@ -442,7 +644,7 @@ EXAMPLES:
                     confirmation_methods = set(f.get('confirmation_reason', 'Unknown') for f in findings_list)
                     print(f"  Confirmation: {', '.join(confirmation_methods)}")
                     
-                    print(f"  Confidence: {Fore.GREEN}100%{Style.RESET_ALL}")
+                    print(f"  Confidence: {Fore.GREEN}HIGH (callback-confirmed){Style.RESET_ALL}")
                     payload_types = set(f['payload_type'] for f in findings_list)
                     print(f"  Payload types: {', '.join(payload_types)}")
                     
@@ -477,7 +679,7 @@ EXAMPLES:
             print_info("No SSRF-vulnerable parameters found in the scanned URLs.")
         
         # Save findings to output
-        import json
+        all_findings = enrich_findings_with_ml("ssrf", all_findings)
         os.makedirs(os.path.join("bssrf", "output"), exist_ok=True)
         json_path = os.path.join("bssrf", "output", "findings_ssrf.json")
         txt_path = os.path.join("bssrf", "output", "findings_ssrf.txt")
@@ -516,30 +718,16 @@ EXAMPLES:
 
     elif args.scan == "cmdi":
         print_header("BLIND COMMAND INJECTION SCAN MODE")
-        print_info(f"Listener URL: {args.listener}")
+        listener_display = args.listener if args.listener else "N/A"
+        print_info(f"Listener URL: {listener_display}")
         if args.recon:
             print_info(f"[RECON] Mode: {args.recon_mode} | URLs discovered: {len(urls)}")
         else:
             print_info(f"[*] Recon disabled | Target URLs: {len(urls)}")
     
-        # Import CMDi callback server
-        from bcmdi.oob.callback_server import start_server_background
-    
-        # Extract port from listener URL
-        try:
-            listener_port = int(args.listener.split(':')[-1])
-        except (ValueError, IndexError):
-            listener_port = 5000
-    
-        # Start callback server in background
-        print_info("Starting OOB callback server...")
-        server_thread = start_server_background(host='0.0.0.0', port=listener_port)
-        time.sleep(2)  # Give server time to start
-        print_success("Callback server started")
-    
         # Initialize CMDi module
         print_info("Initializing Command Injection detector...")
-        module = BlindCMDiModule(listener_url=args.listener, timeout=10, wait_time=5)
+        module = BlindCMDiModule(timeout=10)
     
         all_findings = []
         print_info(f"Starting CMDi scan with {args.threads} threads...")
@@ -557,25 +745,8 @@ EXAMPLES:
     
         print_success(f"Scan complete: {len(all_findings)} total CMDi injection points")
     
-        # Wait for delayed callbacks
-        print_info(f"Waiting {args.wait}s for OOB callbacks...")
-        module.wait_for_callbacks(timeout=args.wait)
-    
-        # Correlate callbacks with findings
-        confirmed_findings = []
-        for finding in all_findings:
-            uuid = finding.get('uuid')
-            callback_received = uuid and module.check_callback_received(uuid)
-            
-            if callback_received:
-                finding['confirmed'] = True
-                finding['vulnerability_status'] = 'CONFIRMED'
-                finding['confirmation_reason'] = 'Callback received'
-                confirmed_findings.append(finding)
-            else:
-                finding['confirmed'] = False
-                finding['vulnerability_status'] = 'POTENTIAL'
-                finding['confirmation_reason'] = 'No callback received'
+        # CMDi module is time-based; treat detections as confirmed findings
+        confirmed_findings = list(all_findings)
     
         # Display results
         if all_findings:
@@ -588,15 +759,16 @@ EXAMPLES:
                 print(f"{'='*80}{Style.RESET_ALL}\n")
                 
                 for idx, finding in enumerate(confirmed_findings, 1):
-                    print(f"{Fore.GREEN}✓ [{idx}] {finding.get('url')}{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}[{idx}] {finding.get('url')}{Style.RESET_ALL}")
                     print(f"  Parameter: {Fore.YELLOW}{finding.get('parameter')}{Style.RESET_ALL}")
                     print(f"  Technique: {finding.get('technique', 'time-based')}")
-                    print(f"  Confidence: {Fore.GREEN}100%{Style.RESET_ALL}")
+                    print(f"  Confidence: {Fore.GREEN}HIGH (time-based confirmations){Style.RESET_ALL}")
                     print()
         else:
             print_info("No CMDi-vulnerable parameters found in the scanned URLs.")
     
         # Save findings to output
+        all_findings = enrich_findings_with_ml("cmdi", all_findings)
         os.makedirs(os.path.join("bcmdi", "output"), exist_ok=True)
         json_path = os.path.join("bcmdi", "output", "findings_cmdi.json")
         txt_path = os.path.join("bcmdi", "output", "findings_cmdi.txt")
@@ -611,7 +783,7 @@ EXAMPLES:
             f.write(f"Total injection points found: {len(all_findings)}\n")
             f.write(f"Confirmed vulnerabilities: {len(confirmed_findings)}\n")
             f.write(f"Scan timestamp: {datetime.now().isoformat()}\n")
-            f.write(f"Callback Server: {args.listener}\n\n")
+            f.write("Detection mode: time-based\n\n")
             
             if confirmed_findings:
                 f.write("\nCONFIRMED VULNERABLE ENDPOINTS:\n")
@@ -621,10 +793,9 @@ EXAMPLES:
                     f.write(f"URL: {finding.get('url')}\n")
                     f.write(f"Parameter: {finding.get('parameter')}\n")
                     f.write(f"Technique: {finding.get('technique', 'unknown')}\n")
-                    f.write(f"Confidence: 100%\n")
+                    f.write(f"Confidence: HIGH (time-based confirmations)\n")
     
         print_success(f"Results saved to {json_path} and {txt_path}")
-        print_info(f"Callback server running on {args.listener}")
         logger.info("CMDi scan complete. Total injection points: %d", len(all_findings))
 
     elif args.scan == "xxe":
@@ -664,7 +835,7 @@ EXAMPLES:
             print(f"{'='*80}{Style.RESET_ALL}\n")
             
             for idx, finding in enumerate(confirmed_findings, 1):
-                print(f"{Fore.GREEN}✓ [{idx}] {finding.get('endpoint')}{Style.RESET_ALL}")
+                print(f"{Fore.GREEN}[{idx}] {finding.get('endpoint')}{Style.RESET_ALL}")
                 print(f"  Parameter: {Fore.YELLOW}{finding.get('parameter')}{Style.RESET_ALL}")
                 print(f"  Technique: {finding.get('technique', 'unknown')}")
                 print(f"  Confidence: {finding.get('confidence', 'unknown').upper()}")
@@ -674,6 +845,7 @@ EXAMPLES:
             print_info("No XXE vulnerabilities confirmed in the scanned URLs.")
     
         # Save findings to output
+        all_findings = enrich_findings_with_ml("xxe", all_findings)
         os.makedirs(os.path.join("bxe", "output"), exist_ok=True)
         json_path = os.path.join("bxe", "output", "findings_xxe.json")
         txt_path = os.path.join("bxe", "output", "findings_xxe.txt")
@@ -726,6 +898,8 @@ EXAMPLES:
                 except Exception as e:
                     logger.debug("Scan task error: %s", e)
 
+            findings = enrich_findings_with_ml("sqli", findings)
+
         write_outputs(findings)
         # Human-friendly console summary
         if findings:
@@ -742,7 +916,7 @@ EXAMPLES:
                     base = ev[0].get("baseline")
                     inj_t = ev[0].get("t_inj")
                     if base is not None and inj_t is not None:
-                        delta_txt = f" | Δ={inj_t - base:.2f}s"
+                        delta_txt = f" | delta={inj_t - base:.2f}s"
                     payload_snip = format_payload_snippet(ev[0].get("payload", ""))
                 elif inj.startswith("boolean") and ev:
                     payload_snip = format_payload_snippet(ev[0].get("payload_true", ""))

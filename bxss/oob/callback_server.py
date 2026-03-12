@@ -23,14 +23,57 @@ from queue import Queue
 import hashlib
 from queue import Queue
 import hashlib
+import socket
+import tempfile
+import time
+import re
 
 # Configuration
-CALLBACK_DB = os.path.join(os.path.dirname(__file__), "..", "output", "callbacks.db")
-INJECTION_EXPIRY_HOURS = 24  # Ignore callbacks for injections older than 24h
+def _resolve_callback_db_path() -> str:
+    override = os.environ.get("SHADOWPROBE_BXSS_CALLBACK_DB")
+    if override:
+        return override
+
+    default_db = os.path.join(os.path.dirname(__file__), "..", "output", "callbacks.db")
+
+    # UNC/WSL-mounted workspaces on Windows frequently hit SQLite lock contention.
+    if os.name == "nt":
+        norm = os.path.normpath(default_db)
+        if norm.startswith("\\\\wsl.localhost\\") or norm.startswith("\\\\"):
+            return os.path.join(tempfile.gettempdir(), "shadowprobe_bxss_callbacks.db")
+
+    return default_db
+
+
+CALLBACK_DB = _resolve_callback_db_path()
+INJECTION_EXPIRY_HOURS = int(os.environ.get("SHADOWPROBE_BXSS_EXPIRY_HOURS", "168"))
 PROCESSING_QUEUE = Queue()
 REPLAY_CHECK_LOCK = Lock()
 
 app = Flask(__name__)
+
+
+def _connect_db():
+    last_error = None
+    for attempt in range(3):
+        try:
+            conn = sqlite3.connect(CALLBACK_DB, timeout=30)
+            try:
+                conn.execute("PRAGMA busy_timeout=30000;")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("PRAGMA journal_mode=WAL;")
+            except sqlite3.OperationalError:
+                try:
+                    conn.execute("PRAGMA journal_mode=DELETE;")
+                except sqlite3.OperationalError:
+                    pass
+            return conn
+        except sqlite3.OperationalError as e:
+            last_error = e
+            time.sleep(0.2 * (attempt + 1))
+    raise sqlite3.OperationalError(f"Failed to connect to callback DB {CALLBACK_DB}: {last_error}")
 
 
 def _init_db():
@@ -40,7 +83,7 @@ def _init_db():
     """
     os.makedirs(os.path.dirname(CALLBACK_DB), exist_ok=True)
     
-    conn = sqlite3.connect(CALLBACK_DB)
+    conn = _connect_db()
     cursor = conn.cursor()
     
     # Callbacks table
@@ -78,13 +121,20 @@ def _init_db():
     conn.close()
 
 
+def _is_port_in_use(host: str, port: int) -> bool:
+    check_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex((check_host, int(port))) == 0
+
+
 def _is_replay(uuid: str, source_ip: str) -> bool:
     """
     Check if this callback is a replay (duplicate UUID+IP).
     Returns True if already seen.
     """
     with REPLAY_CHECK_LOCK:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -98,13 +148,34 @@ def _is_replay(uuid: str, source_ip: str) -> bool:
         return count > 0
 
 
+def _extract_uuid(path: str) -> str:
+    """Extract UUID from query args or callback path patterns like /c/<uuid>."""
+    # Prefer explicit query keys first.
+    for key in ("id", "uuid", "c"):
+        value = request.args.get(key, "")
+        if value:
+            return value
+
+    if not path:
+        return ""
+
+    # Common BXSS callback shape: /c/<uuid>
+    match = re.search(r"(?:^|/)c/([0-9a-fA-F-]{8,})", path)
+    if match:
+        return match.group(1)
+
+    # Fallback: find UUID-looking token anywhere in path.
+    fallback = re.search(r"([0-9a-fA-F]{8}-[0-9a-fA-F-]{13,})", path)
+    return fallback.group(1) if fallback else ""
+
+
 def _persist_callback_db(callback_data: Dict):
     """
     Persist callback to SQLite database.
     Handles replay protection via UNIQUE constraint.
     """
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -195,7 +266,7 @@ def catch_all(path):
         "user_agent": request.headers.get('User-Agent', ''),
         "referer": request.headers.get('Referer', ''),
         "headers": dict(request.headers),
-        "uuid": request.args.get('id', ''),  # Extract UUID from ?id= parameter
+        "uuid": _extract_uuid(path),
         "cookies": dict(request.cookies) if request.cookies else {},
         "x_forwarded_for": x_forwarded_for,
     }
@@ -218,7 +289,7 @@ def serve_js():
     Serve JavaScript payload for <script src=> callbacks.
     Can optionally execute additional exfiltration.
     """
-    uuid = request.args.get('id', '')
+    uuid = _extract_uuid("x.js")
     x_forwarded_for = request.headers.get('X-Forwarded-For', '')
     real_ip = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.remote_addr
     
@@ -261,7 +332,7 @@ def get_callbacks(since: Optional[str] = None, uuid_filter: Optional[str] = None
         List of callback dictionaries
     """
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -313,7 +384,7 @@ def clear_callbacks():
     Clear all callbacks from database (useful for testing).
     """
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM callbacks")
         conn.commit()
@@ -328,7 +399,7 @@ def get_callback_stats() -> Dict:
     Get statistics about stored callbacks.
     """
     try:
-        conn = sqlite3.connect(CALLBACK_DB)
+        conn = _connect_db()
         cursor = conn.cursor()
         
         cursor.execute("SELECT COUNT(*) FROM callbacks")
@@ -375,14 +446,12 @@ def start_server_background(host='0.0.0.0', port=5000):
     """
     Start the callback server in a daemon thread (non-blocking).
     """
-    # Initialize database
-    _init_db()
-    
-    # Start async processing worker
-    worker = Thread(target=_processing_worker, daemon=True)
-    worker.start()
-    
-    # Start Flask server
+    # If server is already up, reuse existing listener.
+    if _is_port_in_use(host, port):
+        print(f"[OOB] Callback server already running on http://{host}:{port}; reusing existing listener")
+        return None
+
+    # Start server once; start_server handles DB init + worker startup.
     thread = Thread(target=start_server, args=(host, port, False), daemon=True)
     thread.start()
     return thread
